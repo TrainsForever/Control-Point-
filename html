@@ -9233,6 +9233,7641 @@ updateTrafficDisplay();
 /* ============================================================
    END PART 4
    ============================================================ */
+/* ============================================================
+   CONTROL POINT
+   PART 5 — DISPATCHER CONTROL LAYER
+   ============================================================ */
+
+/*
+    This layer sits on top of the Part 1–4 simulation.
+
+    Core philosophy:
+
+      DISPATCHER
+          ↓
+      ROUTE REQUEST
+          ↓
+      SWITCH ALIGNMENT
+          ↓
+      ROUTE CONFLICT CHECK
+          ↓
+      BLOCK CHECK
+          ↓
+      SIGNAL INDICATION
+          ↓
+      TRAIN AUTHORITY
+          ↓
+      TRAIN MOVEMENT
+          ↓
+      BLOCK OCCUPANCY
+
+    White = normal/unlined
+    Green = lined route
+    Red   = occupied
+*/
+
+
+/* ============================================================
+   5.1 DISPATCHER STATE
+   ============================================================ */
+
+CP.dispatcher = CP.dispatcher || {};
+
+Object.assign(CP.dispatcher, {
+    selectedControlPoint: null,
+    selectedSignal: null,
+    selectedSwitch: null,
+    selectedTrain: null,
+
+    activeRoutes: {},
+    lockedRoutes: {},
+    heldSignals: {},
+
+    lastAction: "",
+    lastActionTime: 0
+});
+
+
+/* ============================================================
+   5.2 DISPATCHER EVENT SYSTEM
+   ============================================================ */
+
+function dispatcherEvent(message, type = "normal") {
+
+    const timestamp = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+    });
+
+    const entry = {
+        time: timestamp,
+        message,
+        type
+    };
+
+    CP.dispatcher.lastAction = message;
+    CP.dispatcher.lastActionTime = Date.now();
+
+    if (!CP.dispatcherLog) {
+        CP.dispatcherLog = [];
+    }
+
+    CP.dispatcherLog.unshift(entry);
+
+    /*
+       Keep the internal log from growing forever.
+    */
+    if (CP.dispatcherLog.length > 100) {
+        CP.dispatcherLog.length = 100;
+    }
+
+    /*
+       Existing radio/event system.
+       We deliberately try several common structures so this
+       layer does not destroy the existing Part 1–4 logger.
+    */
+
+    try {
+        if (typeof addRadioLog === "function") {
+            addRadioLog(message);
+        }
+    } catch (e) {}
+
+    try {
+        if (typeof radioLog === "function") {
+            radioLog(message);
+        }
+    } catch (e) {}
+
+    try {
+        if (typeof addEventLog === "function") {
+            addEventLog(message);
+        }
+    } catch (e) {}
+
+    renderDispatcherLog();
+}
+
+
+/* ============================================================
+   5.3 DISPATCHER LOG PANEL
+   ============================================================ */
+
+function renderDispatcherLog() {
+
+    let panel = document.getElementById("cp-dispatcher-log");
+
+    if (!panel) {
+
+        panel = document.createElement("div");
+        panel.id = "cp-dispatcher-log";
+
+        panel.style.position = "fixed";
+        panel.style.right = "12px";
+        panel.style.bottom = "12px";
+        panel.style.width = "310px";
+        panel.style.maxHeight = "180px";
+        panel.style.background = "rgba(0,0,0,.94)";
+        panel.style.border = "1px solid #333";
+        panel.style.color = "#ddd";
+        panel.style.fontFamily = "monospace";
+        panel.style.fontSize = "10px";
+        panel.style.zIndex = "9000";
+        panel.style.overflow = "hidden";
+        panel.style.pointerEvents = "none";
+        panel.style.boxShadow = "0 4px 20px rgba(0,0,0,.5)";
+
+        document.body.appendChild(panel);
+    }
+
+    const log = CP.dispatcherLog || [];
+
+    panel.innerHTML = `
+        <div style="
+            padding:5px 7px;
+            border-bottom:1px solid #333;
+            color:#fff;
+            font-weight:bold;
+            letter-spacing:.5px;
+        ">
+            DISPATCHER LOG
+        </div>
+
+        <div style="
+            max-height:150px;
+            overflow:hidden;
+        ">
+            ${
+                log.slice(0, 12).map(item => `
+                    <div style="
+                        padding:2px 7px;
+                        border-bottom:1px solid rgba(255,255,255,.04);
+                        white-space:nowrap;
+                        overflow:hidden;
+                        text-overflow:ellipsis;
+                    ">
+                        <span style="color:#777">${item.time}</span>
+                        &nbsp;
+                        ${item.message}
+                    </div>
+                `).join("")
+            }
+        </div>
+    `;
+}
+
+
+/* ============================================================
+   5.4 SELECTED OBJECT PANEL
+   ============================================================ */
+
+function createDispatcherSelectionPanel() {
+
+    if (document.getElementById("cp-selection-panel")) {
+        return;
+    }
+
+    const panel = document.createElement("div");
+
+    panel.id = "cp-selection-panel";
+
+    panel.style.position = "fixed";
+    panel.style.left = "12px";
+    panel.style.bottom = "12px";
+    panel.style.width = "280px";
+    panel.style.background = "rgba(0,0,0,.95)";
+    panel.style.border = "1px solid #333";
+    panel.style.color = "#ddd";
+    panel.style.fontFamily = "monospace";
+    panel.style.fontSize = "11px";
+    panel.style.zIndex = "8999";
+    panel.style.display = "none";
+    panel.style.boxShadow = "0 4px 20px rgba(0,0,0,.5)";
+
+    document.body.appendChild(panel);
+}
+
+
+function showDispatcherSelection(title, body, buttons = []) {
+
+    createDispatcherSelectionPanel();
+
+    const panel = document.getElementById("cp-selection-panel");
+
+    panel.style.display = "block";
+
+    panel.innerHTML = `
+        <div style="
+            padding:7px 9px;
+            border-bottom:1px solid #333;
+            color:#fff;
+            font-weight:bold;
+        ">
+            ${title}
+        </div>
+
+        <div style="padding:9px; line-height:1.55;">
+            ${body}
+        </div>
+
+        <div style="
+            display:flex;
+            flex-wrap:wrap;
+            gap:5px;
+            padding:7px 9px;
+            border-top:1px solid #333;
+        ">
+            ${buttons.map(button => `
+                <button
+                    data-cp-action="${button.action}"
+                    style="
+                        background:#111;
+                        border:1px solid #555;
+                        color:#ddd;
+                        padding:5px 8px;
+                        font-family:monospace;
+                        font-size:10px;
+                        cursor:pointer;
+                    "
+                >
+                    ${button.label}
+                </button>
+            `).join("")}
+        </div>
+    `;
+
+    panel.querySelectorAll("[data-cp-action]").forEach(button => {
+
+        button.addEventListener("click", () => {
+
+            const action = button.dataset.cpAction;
+
+            if (typeof window[action] === "function") {
+                window[action]();
+            }
+        });
+    });
+}
+
+
+function hideDispatcherSelection() {
+
+    const panel = document.getElementById("cp-selection-panel");
+
+    if (panel) {
+        panel.style.display = "none";
+    }
+
+    CP.dispatcher.selectedControlPoint = null;
+    CP.dispatcher.selectedSignal = null;
+    CP.dispatcher.selectedSwitch = null;
+}
+
+
+/* ============================================================
+   5.5 CONTROL POINT SELECTION
+   ============================================================ */
+
+function selectControlPoint(cpName) {
+
+    CP.dispatcher.selectedControlPoint = cpName;
+
+    const cpData =
+        (typeof TERRITORY_LOCATIONS !== "undefined")
+            ? TERRITORY_LOCATIONS.find(x =>
+                x.name === cpName ||
+                x.id === cpName
+            )
+            : null;
+
+    if (!cpData) {
+        dispatcherEvent(`CONTROL POINT ${cpName} SELECTED`);
+        return;
+    }
+
+    const milepost =
+        cpData.mp !== undefined
+            ? cpData.mp.toFixed(1)
+            : "—";
+
+    showDispatcherSelection(
+        `CONTROL POINT ${cpName}`,
+        `
+            <div>Milepost: <b>${milepost}</b></div>
+            <div style="color:#888;margin-top:4px;">
+                Select a route, signal, or switch on this territory.
+            </div>
+        `,
+        [
+            {
+                label: "CLOSE",
+                action: "hideDispatcherSelection"
+            }
+        ]
+    );
+
+    dispatcherEvent(`CONTROL POINT ${cpName} SELECTED`);
+}
+
+
+/* ============================================================
+   5.6 ROUTE VALIDATION
+   ============================================================ */
+
+function dispatcherCanLineRoute(route) {
+
+    if (!route) {
+        return {
+            allowed: false,
+            reason: "ROUTE NOT FOUND"
+        };
+    }
+
+    /*
+       Existing Part 3 conflict engine.
+    */
+
+    try {
+        if (typeof routeSafetyCheck === "function") {
+
+            const result = routeSafetyCheck(route);
+
+            if (result === false) {
+                return {
+                    allowed: false,
+                    reason: "ROUTE CONFLICT"
+                };
+            }
+
+            if (result && result.allowed === false) {
+                return result;
+            }
+        }
+    } catch (e) {}
+
+    /*
+       Block protection.
+    */
+
+    try {
+        if (typeof route.blocks !== "undefined" &&
+            typeof isBlockOccupied === "function") {
+
+            for (const block of route.blocks) {
+
+                if (isBlockOccupied(block)) {
+
+                    return {
+                        allowed: false,
+                        reason: `BLOCK ${block} OCCUPIED`
+                    };
+                }
+            }
+        }
+    } catch (e) {}
+
+    /*
+       Existing route-lock protection.
+    */
+
+    if (route.id && CP.dispatcher.lockedRoutes[route.id]) {
+
+        return {
+            allowed: false,
+            reason: "ROUTE ALREADY LOCKED"
+        };
+    }
+
+    /*
+       Check switch conflicts if route data provides them.
+    */
+
+    if (route.switches && Array.isArray(route.switches)) {
+
+        for (const switchId of route.switches) {
+
+            const conflictingRoute =
+                Object.values(CP.dispatcher.lockedRoutes)
+                    .find(r =>
+                        r &&
+                        r.switches &&
+                        r.switches.includes(switchId)
+                    );
+
+            if (conflictingRoute) {
+
+                return {
+                    allowed: false,
+                    reason: `SWITCH ${switchId} LOCKED`
+                };
+            }
+        }
+    }
+
+    return {
+        allowed: true,
+        reason: "ROUTE CLEAR"
+    };
+}
+
+
+/* ============================================================
+   5.7 ALIGN ROUTE SWITCHES
+   ============================================================ */
+
+function dispatcherAlignRoute(route) {
+
+    if (!route) return false;
+
+    /*
+       Use the existing switch alignment system where available.
+    */
+
+    try {
+
+        if (typeof alignRouteSwitches === "function") {
+
+            const result = alignRouteSwitches(route);
+
+            if (result === false) {
+                dispatcherEvent(
+                    `ROUTE ${route.id || "UNKNOWN"} SWITCH ALIGNMENT FAILED`,
+                    "error"
+                );
+
+                return false;
+            }
+        }
+
+    } catch (e) {
+
+        console.warn(
+            "CONTROL POINT: route switch alignment error",
+            e
+        );
+
+        return false;
+    }
+
+    return true;
+}
+
+
+/* ============================================================
+   5.8 LOCK ROUTE
+   ============================================================ */
+
+function dispatcherLockRoute(route) {
+
+    if (!route || !route.id) {
+        return false;
+    }
+
+    CP.dispatcher.lockedRoutes[route.id] = {
+        id: route.id,
+        origin: route.origin,
+        destination: route.destination,
+        switches: route.switches
+            ? [...route.switches]
+            : [],
+        blocks: route.blocks
+            ? [...route.blocks]
+            : [],
+        lockedAt: Date.now()
+    };
+
+    CP.dispatcher.activeRoutes[route.id] = route;
+
+    /*
+       Mirror into existing route state.
+    */
+
+    try {
+        if (typeof routeLocks !== "undefined") {
+            routeLocks[route.id] = true;
+        }
+    } catch (e) {}
+
+    try {
+        if (typeof activeRoutes !== "undefined") {
+            activeRoutes[route.id] = route;
+        }
+    } catch (e) {}
+
+    return true;
+}
+
+
+/* ============================================================
+   5.9 RELEASE ROUTE
+   ============================================================ */
+
+function dispatcherReleaseRoute(routeId) {
+
+    if (!routeId) return;
+
+    delete CP.dispatcher.lockedRoutes[routeId];
+    delete CP.dispatcher.activeRoutes[routeId];
+
+    try {
+        if (typeof routeLocks !== "undefined") {
+            delete routeLocks[routeId];
+        }
+    } catch (e) {}
+
+    try {
+        if (typeof releaseRoute === "function") {
+            releaseRoute(routeId);
+        }
+    } catch (e) {}
+
+    dispatcherEvent(`ROUTE ${routeId} RELEASED`);
+}
+
+
+/* ============================================================
+   5.10 LINE ROUTE
+   ============================================================ */
+
+function dispatcherLineRoute(route) {
+
+    if (!route) return false;
+
+    const validation =
+        dispatcherCanLineRoute(route);
+
+    if (!validation.allowed) {
+
+        dispatcherEvent(
+            `ROUTE ${route.id || "UNKNOWN"} NOT LINED: ${validation.reason}`,
+            "error"
+        );
+
+        return false;
+    }
+
+    if (!dispatcherAlignRoute(route)) {
+        return false;
+    }
+
+    if (!dispatcherLockRoute(route)) {
+
+        dispatcherEvent(
+            `ROUTE ${route.id || "UNKNOWN"} LOCK FAILED`,
+            "error"
+        );
+
+        return false;
+    }
+
+    /*
+       Existing route system.
+    */
+
+    try {
+
+        if (typeof activateRoute === "function") {
+            activateRoute(route);
+        }
+
+    } catch (e) {}
+
+    try {
+
+        if (typeof setRouteActive === "function") {
+            setRouteActive(route.id, true);
+        }
+
+    } catch (e) {}
+
+    dispatcherEvent(
+        `ROUTE LINED ${route.origin || "?"} → ${route.destination || "?"}`,
+        "route"
+    );
+
+    return true;
+}
+
+
+/* ============================================================
+   5.11 FIND ROUTES FOR A CONTROL POINT
+   ============================================================ */
+
+function getDispatcherRoutesForControlPoint(cpName) {
+
+    if (typeof ROUTES === "undefined") {
+        return [];
+    }
+
+    return Object.values(ROUTES).filter(route => {
+
+        if (!route) return false;
+
+        return (
+            route.origin === cpName ||
+            route.destination === cpName ||
+            route.from === cpName ||
+            route.to === cpName ||
+            route.controlPoint === cpName
+        );
+    });
+}
+
+
+/* ============================================================
+   5.12 ROUTE SELECTION MENU
+   ============================================================ */
+
+function openControlPointRoutes(cpName) {
+
+    const routes =
+        getDispatcherRoutesForControlPoint(cpName);
+
+    CP.dispatcher.selectedControlPoint = cpName;
+
+    if (!routes.length) {
+
+        showDispatcherSelection(
+            `CONTROL POINT ${cpName}`,
+            `
+                <div style="color:#999;">
+                    No dispatcher routes are currently defined
+                    for this control point.
+                </div>
+            `,
+            [
+                {
+                    label: "CLOSE",
+                    action: "hideDispatcherSelection"
+                }
+            ]
+        );
+
+        return;
+    }
+
+    showDispatcherSelection(
+        `ROUTES — ${cpName}`,
+        routes.map(route => `
+            <div style="
+                padding:4px 0;
+                border-bottom:1px solid #222;
+            ">
+                <b>${route.id || "ROUTE"}</b>
+                &nbsp;
+                ${route.origin || "?"}
+                →
+                ${route.destination || "?"}
+            </div>
+        `).join(""),
+        [
+            ...routes.map(route => ({
+                label: `LINE ${route.id}`,
+                action: `lineRoute_${route.id}`
+            })),
+            {
+                label: "CLOSE",
+                action: "hideDispatcherSelection"
+            }
+        ]
+    );
+
+    /*
+       Create safe global action functions for the buttons.
+    */
+
+    routes.forEach(route => {
+
+        const functionName = `lineRoute_${route.id}`;
+
+        window[functionName] = function() {
+            dispatcherLineRoute(route);
+            hideDispatcherSelection();
+        };
+    });
+}
+
+
+/* ============================================================
+   5.13 SIGNAL HOLD
+   ============================================================ */
+
+function dispatcherHoldSignal(signalId) {
+
+    if (!signalId) return;
+
+    CP.dispatcher.heldSignals[signalId] = true;
+
+    try {
+        if (typeof heldSignals !== "undefined") {
+            heldSignals[signalId] = true;
+        }
+    } catch (e) {}
+
+    dispatcherEvent(
+        `SIGNAL ${signalId} HELD AT STOP`
+    );
+}
+
+
+/* ============================================================
+   5.14 SIGNAL RELEASE
+   ============================================================ */
+
+function dispatcherReleaseSignal(signalId) {
+
+    if (!signalId) return;
+
+    delete CP.dispatcher.heldSignals[signalId];
+
+    try {
+        if (typeof heldSignals !== "undefined") {
+            delete heldSignals[signalId];
+        }
+    } catch (e) {}
+
+    dispatcherEvent(
+        `SIGNAL ${signalId} RELEASED`
+    );
+}
+
+
+/* ============================================================
+   5.15 SIGNAL CLICK HANDLER
+   ============================================================ */
+
+function selectDispatcherSignal(signal) {
+
+    if (!signal) return;
+
+    CP.dispatcher.selectedSignal = signal.id;
+
+    const held =
+        !!CP.dispatcher.heldSignals[signal.id];
+
+    let indication = "STOP";
+
+    try {
+
+        if (typeof getSignalIndication === "function") {
+
+            indication =
+                getSignalIndication(signal.id) ||
+                getSignalIndication(signal) ||
+                "STOP";
+        }
+
+    } catch (e) {}
+
+    showDispatcherSelection(
+        `SIGNAL ${signal.id}`,
+        `
+            <div>Indication:
+                <b style="color:${
+                    indication === "STOP"
+                        ? "#f33"
+                        : "#6f6"
+                };">
+                    ${indication}
+                </b>
+            </div>
+
+            <div>
+                Status:
+                <b>${held ? "HELD" : "AVAILABLE"}</b>
+            </div>
+        `,
+        held
+            ? [
+                {
+                    label: "RELEASE",
+                    action: "releaseSelectedSignal"
+                },
+                {
+                    label: "CLOSE",
+                    action: "hideDispatcherSelection"
+                }
+            ]
+            : [
+                {
+                    label: "HOLD AT STOP",
+                    action: "holdSelectedSignal"
+                },
+                {
+                    label: "CLOSE",
+                    action: "hideDispatcherSelection"
+                }
+            ]
+    );
+
+    window.holdSelectedSignal = function() {
+
+        dispatcherHoldSignal(signal.id);
+        selectDispatcherSignal(signal);
+    };
+
+    window.releaseSelectedSignal = function() {
+
+        dispatcherReleaseSignal(signal.id);
+        selectDispatcherSignal(signal);
+    };
+}
+
+
+/* ============================================================
+   5.16 SWITCH SELECTION
+   ============================================================ */
+
+function selectDispatcherSwitch(switchObj) {
+
+    if (!switchObj) return;
+
+    CP.dispatcher.selectedSwitch =
+        switchObj.id;
+
+    const position =
+        switchObj.position ||
+        switchObj.state ||
+        "NORMAL";
+
+    showDispatcherSelection(
+        `SWITCH ${switchObj.id}`,
+        `
+            <div>
+                Current position:
+                <b>${position}</b>
+            </div>
+
+            <div style="
+                color:#888;
+                margin-top:5px;
+            ">
+                Switches are protected by route locking.
+                Manual movement is blocked while the
+                switch is required by an active route.
+            </div>
+        `,
+        [
+            {
+                label: "CLOSE",
+                action: "hideDispatcherSelection"
+            }
+        ]
+    );
+}
+
+
+/* ============================================================
+   5.17 TRAIN SELECTION
+   ============================================================ */
+
+function selectDispatcherTrain(train) {
+
+    if (!train) return;
+
+    CP.dispatcher.selectedTrain =
+        train.id || train.symbol;
+
+    const id =
+        train.id ||
+        train.symbol ||
+        "UNKNOWN";
+
+    const mp =
+        Number.isFinite(train.mp)
+            ? train.mp.toFixed(1)
+            : "—";
+
+    const speed =
+        Number.isFinite(train.speed)
+            ? Math.round(train.speed)
+            : 0;
+
+    const length =
+        Number.isFinite(train.length)
+            ? Math.round(train.length)
+            : "—";
+
+    const direction =
+        train.direction ||
+        "UNKNOWN";
+
+    showDispatcherSelection(
+        `TRAIN ${id}`,
+        `
+            <div>MP: <b>${mp}</b></div>
+            <div>Speed: <b>${speed} MPH</b></div>
+            <div>Length: <b>${length} ft</b></div>
+            <div>Direction: <b>${direction}</b></div>
+        `,
+        [
+            {
+                label: "CLOSE",
+                action: "hideDispatcherSelection"
+            }
+        ]
+    );
+}
+
+
+/* ============================================================
+   5.18 YARD DEPARTURE / ROLL-BY LOGIC
+   ============================================================ */
+
+/*
+   A train leaving a yard or outbound track begins under the
+   applicable restricted departure speed.
+
+   The dispatcher does NOT simply teleport the train onto the
+   main line.
+
+   The train must:
+      1. Receive a valid route.
+      2. Receive a permissive signal.
+      3. Enter the controlled track.
+      4. Remain at ≤10 MPH through the applicable roll-by area.
+      5. Continue until the entire train clears the limit.
+*/
+
+function setTrainYardDeparture(train, departureMP, clearanceMP) {
+
+    if (!train) return;
+
+    train.yardDeparture = true;
+
+    train.yardDepartureMP =
+        Number(departureMP);
+
+    train.yardClearanceMP =
+        Number(clearanceMP);
+
+    train.yardDepartureSpeedLimit = 10;
+
+    train.yardDepartureCleared = false;
+
+    dispatcherEvent(
+        `${train.id || train.symbol || "TRAIN"} DEPARTURE AUTHORIZED — ROLL-BY LIMIT 10 MPH`
+    );
+}
+
+
+function updateTrainYardDeparture(train) {
+
+    if (!train || !train.yardDeparture) {
+        return;
+    }
+
+    const frontMP = Number(train.mp);
+
+    const rearMP =
+        Number.isFinite(train.rearMP)
+            ? Number(train.rearMP)
+            : frontMP;
+
+    const clearanceMP =
+        Number(train.yardClearanceMP);
+
+    /*
+       The whole train must clear the limit.
+
+       Direction is handled separately because mileposts may
+       decrease or increase depending on territory direction.
+    */
+
+    const direction =
+        String(train.direction || "").toUpperCase();
+
+    let cleared = false;
+
+    if (direction === "EAST" || direction === "EASTBOUND") {
+
+        cleared =
+            rearMP <= clearanceMP;
+
+    } else {
+
+        cleared =
+            rearMP >= clearanceMP;
+    }
+
+    if (cleared && !train.yardDepartureCleared) {
+
+        train.yardDepartureCleared = true;
+
+        dispatcherEvent(
+            `${train.id || train.symbol || "TRAIN"} CLEAR OF ROLL-BY LIMIT`
+        );
+    }
+}
+
+
+/* ============================================================
+   5.19 TRAIN SPEED ENFORCEMENT
+   ============================================================ */
+
+function dispatcherApplySpeedAuthority(train) {
+
+    if (!train) return;
+
+    let limit = Infinity;
+
+    /*
+       Yard departure restriction.
+    */
+
+    if (
+        train.yardDeparture &&
+        !train.yardDepartureCleared
+    ) {
+        limit = Math.min(
+            limit,
+            train.yardDepartureSpeedLimit || 10
+        );
+    }
+
+    /*
+       Existing authorized-speed engine.
+    */
+
+    try {
+
+        if (typeof getTrainAuthorizedSpeed === "function") {
+
+            const authorized =
+                getTrainAuthorizedSpeed(train);
+
+            if (Number.isFinite(authorized)) {
+                limit = Math.min(limit, authorized);
+            }
+        }
+
+    } catch (e) {}
+
+    /*
+       Do not allow the dispatcher layer to override a
+       physical stop signal.
+    */
+
+    if (train.signalIndication) {
+
+        const indication =
+            String(train.signalIndication).toUpperCase();
+
+        if (
+            indication === "STOP" ||
+            indication === "STOP AND PROCEED"
+        ) {
+            limit = 0;
+        }
+    }
+
+    train.dispatcherSpeedLimit = limit;
+
+    /*
+       Apply the cap to whatever Part 4 uses.
+    */
+
+    if (Number.isFinite(train.speed)) {
+
+        if (limit === 0) {
+            train.speed = 0;
+        } else if (
+            Number.isFinite(limit) &&
+            train.speed > limit
+        ) {
+            train.speed = limit;
+        }
+    }
+}
+
+
+/* ============================================================
+   5.20 ROUTE OCCUPANCY DISPLAY STATE
+   ============================================================ */
+
+function getDispatcherTrackState(trackId, blockId) {
+
+    /*
+       Occupied takes priority over route color.
+
+       RED = train physically occupies block
+       GREEN = block is lined and protected
+       WHITE = normal
+    */
+
+    let occupied = false;
+
+    try {
+
+        if (
+            typeof isBlockOccupied === "function" &&
+            blockId
+        ) {
+            occupied =
+                !!isBlockOccupied(blockId);
+        }
+
+    } catch (e) {}
+
+    if (occupied) {
+        return "occupied";
+    }
+
+    /*
+       Search active routes.
+    */
+
+    const active =
+        Object.values(CP.dispatcher.activeRoutes || {});
+
+    for (const route of active) {
+
+        if (!route) continue;
+
+        if (
+            route.blocks &&
+            blockId &&
+            route.blocks.includes(blockId)
+        ) {
+            return "lined";
+        }
+
+        if (
+            route.tracks &&
+            trackId &&
+            route.tracks.includes(trackId)
+        ) {
+            return "lined";
+        }
+    }
+
+    return "normal";
+}
+
+
+/* ============================================================
+   5.21 DISPATCHER CONTROL HOTKEYS
+   ============================================================ */
+
+document.addEventListener("keydown", event => {
+
+    /*
+       ESC = close current selection
+    */
+
+    if (event.key === "Escape") {
+        hideDispatcherSelection();
+    }
+});
+
+
+/* ============================================================
+   5.22 BOARD CLICK INTERACTION
+   ============================================================ */
+
+function installDispatcherBoardInteraction() {
+
+    /*
+       The game may use a canvas, SVG, or HTML track elements.
+
+       We listen globally and only react to objects explicitly
+       tagged by the renderer.
+    */
+
+    document.addEventListener("click", event => {
+
+        const target =
+            event.target.closest
+                ? event.target.closest(
+                    "[data-cp-control-point]," +
+                    "[data-cp-signal]," +
+                    "[data-cp-switch]," +
+                    "[data-cp-train]"
+                )
+                : null;
+
+        if (!target) return;
+
+        /*
+           CONTROL POINT
+        */
+
+        if (target.dataset.cpControlPoint) {
+
+            openControlPointRoutes(
+                target.dataset.cpControlPoint
+            );
+
+            return;
+        }
+
+        /*
+           SIGNAL
+        */
+
+        if (target.dataset.cpSignal) {
+
+            const signalId =
+                target.dataset.cpSignal;
+
+            let signal = null;
+
+            try {
+
+                if (
+                    typeof SIGNALS !== "undefined" &&
+                    Array.isArray(SIGNALS)
+                ) {
+
+                    signal =
+                        SIGNALS.find(
+                            s => s.id === signalId
+                        );
+                }
+
+            } catch (e) {}
+
+            if (!signal) {
+                signal = {
+                    id: signalId
+                };
+            }
+
+            selectDispatcherSignal(signal);
+
+            return;
+        }
+
+        /*
+           SWITCH
+        */
+
+        if (target.dataset.cpSwitch) {
+
+            const switchId =
+                target.dataset.cpSwitch;
+
+            let switchObj = null;
+
+            try {
+
+                if (
+                    typeof SWITCHES !== "undefined" &&
+                    Array.isArray(SWITCHES)
+                ) {
+
+                    switchObj =
+                        SWITCHES.find(
+                            s => s.id === switchId
+                        );
+                }
+
+            } catch (e) {}
+
+            if (!switchObj) {
+                switchObj = {
+                    id: switchId
+                };
+            }
+
+            selectDispatcherSwitch(switchObj);
+
+            return;
+        }
+
+        /*
+           TRAIN
+        */
+
+        if (target.dataset.cpTrain) {
+
+            const trainId =
+                target.dataset.cpTrain;
+
+            let train = null;
+
+            try {
+
+                if (
+                    typeof CP !== "undefined" &&
+                    Array.isArray(CP.trains)
+                ) {
+
+                    train =
+                        CP.trains.find(
+                            t =>
+                                t.id === trainId ||
+                                t.symbol === trainId
+                        );
+                }
+
+            } catch (e) {}
+
+            if (train) {
+                selectDispatcherTrain(train);
+            }
+        }
+    });
+}
+
+
+/* ============================================================
+   5.23 ADD INTERACTION TAGS TO DOM OBJECTS
+   ============================================================ */
+
+function tagDispatcherElements() {
+
+    /*
+       Control points
+    */
+
+    document
+        .querySelectorAll("[data-control-point]")
+        .forEach(element => {
+
+            if (!element.dataset.cpControlPoint) {
+
+                element.dataset.cpControlPoint =
+                    element.dataset.controlPoint;
+            }
+        });
+
+    /*
+       Signals
+    */
+
+    document
+        .querySelectorAll("[data-signal-id]")
+        .forEach(element => {
+
+            if (!element.dataset.cpSignal) {
+
+                element.dataset.cpSignal =
+                    element.dataset.signalId;
+            }
+        });
+
+    /*
+       Switches
+    */
+
+    document
+        .querySelectorAll("[data-switch-id]")
+        .forEach(element => {
+
+            if (!element.dataset.cpSwitch) {
+
+                element.dataset.cpSwitch =
+                    element.dataset.switchId;
+            }
+        });
+
+    /*
+       Trains
+    */
+
+    document
+        .querySelectorAll("[data-train-id]")
+        .forEach(element => {
+
+            if (!element.dataset.cpTrain) {
+
+                element.dataset.cpTrain =
+                    element.dataset.trainId;
+            }
+        });
+}
+
+
+/* ============================================================
+   5.24 DISPATCHER UPDATE LOOP
+   ============================================================ */
+
+function updateDispatcherControlLayer() {
+
+    /*
+       Apply dispatcher speed authority to every train.
+    */
+
+    try {
+
+        if (
+            typeof CP !== "undefined" &&
+            Array.isArray(CP.trains)
+        ) {
+
+            CP.trains.forEach(train => {
+
+                dispatcherApplySpeedAuthority(train);
+
+                updateTrainYardDeparture(train);
+            });
+        }
+
+    } catch (e) {}
+
+    /*
+       Re-tag dynamically generated board objects.
+    */
+
+    tagDispatcherElements();
+}
+
+
+/* ============================================================
+   5.25 WRAP EXISTING SIMULATION LOOP
+   ============================================================ */
+
+(function installDispatcherSimulationHook() {
+
+    const previousUpdate =
+        window.updateSimulation;
+
+    if (
+        typeof previousUpdate === "function" &&
+        !window.__cpDispatcherHookInstalled
+    ) {
+
+        window.updateSimulation = function(...args) {
+
+            previousUpdate.apply(this, args);
+
+            updateDispatcherControlLayer();
+        };
+
+        window.__cpDispatcherHookInstalled = true;
+    }
+
+})();
+
+
+/* ============================================================
+   5.26 DISPATCHER INITIALIZATION
+   ============================================================ */
+
+function initializeDispatcherControlLayer() {
+
+    createDispatcherSelectionPanel();
+    renderDispatcherLog();
+    installDispatcherBoardInteraction();
+    tagDispatcherElements();
+
+    dispatcherEvent(
+        "DISPATCHER CONTROL SYSTEM ONLINE"
+    );
+
+    dispatcherEvent(
+        "ROUTE • SIGNAL • BLOCK • TRAIN PROTECTION ACTIVE"
+    );
+}
+
+
+/* ============================================================
+   5.27 INITIALIZE
+   ============================================================ */
+
+if (
+    document.readyState === "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeDispatcherControlLayer,
+        { once: true }
+    );
+
+} else {
+
+    initializeDispatcherControlLayer();
+}
+
+
+/* ============================================================
+   5.28 DISPATCHER DIAGNOSTICS
+   ============================================================ */
+
+window.CONTROL_POINT_DISPATCHER = {
+
+    state: CP.dispatcher,
+
+    lineRoute: dispatcherLineRoute,
+
+    releaseRoute: dispatcherReleaseRoute,
+
+    holdSignal: dispatcherHoldSignal,
+
+    releaseSignal: dispatcherReleaseSignal,
+
+    selectTrain: selectDispatcherTrain,
+
+    selectSignal: selectDispatcherSignal,
+
+    selectSwitch: selectDispatcherSwitch,
+
+    selectControlPoint: selectControlPoint,
+
+    setYardDeparture: setTrainYardDeparture,
+
+    log: dispatcherEvent
+};
+
+
+console.log(
+    "%cCONTROL POINT — PART 5 ONLINE",
+    "font-weight:bold;font-size:14px;"
+);
+
+console.log(
+    "Dispatcher control layer initialized."
+);
+
+console.log(
+    "Route protection: ACTIVE"
+);
+
+console.log(
+    "Signal protection: ACTIVE"
+);
+
+console.log(
+    "Train speed authority: ACTIVE"
+);
+
+console.log(
+    "Yard roll-by protection: ACTIVE"
+);
+
+
+/* ============================================================
+   END PART 5
+   ============================================================ */
+/* ============================================================
+   CONTROL POINT
+   PART 6 — ATCS TERRITORY BOARD RENDERER
+   ============================================================ */
+
+/*
+   PURPOSE
+   -------
+   This renderer creates the dispatcher territory display.
+
+   DESIGN RULES:
+
+      BLACK   = background
+      WHITE   = normal track
+      GREEN   = lined route
+      RED     = occupied track
+
+   The territory is deliberately schematic.
+
+   It is NOT a geographic map.
+
+   It is NOT a modern video-game HUD.
+
+   The board is designed to feel like a railroad
+   dispatching display: compact, horizontal, technical,
+   information-dense, and easy to pan.
+*/
+
+
+/* ============================================================
+   6.1 BOARD CONFIGURATION
+   ============================================================ */
+
+const ATCS_BOARD = {
+
+    width: 7600,
+
+    top: 58,
+
+    trackRows: {
+        main1: 125,
+        main2: 175,
+        siding: 225,
+        main3: 285,
+        main4: 335
+    },
+
+    trackHeight: 2,
+
+    labelOffset: 14,
+
+    signalHeight: 18,
+
+    switchSize: 8,
+
+    colors: {
+
+        background: "#000000",
+
+        track: "#d8d8d8",
+
+        occupied: "#e32626",
+
+        route: "#20e85a",
+
+        text: "#e2e2e2",
+
+        location: "#ff3030",
+
+        milepost: "#888888",
+
+        signal: "#bdbdbd",
+
+        switch: "#d0d0d0",
+
+        restriction: "#aaaaaa",
+
+        yard: "#777777"
+    }
+};
+
+
+/* ============================================================
+   6.2 TERRITORY SCALE
+   ============================================================ */
+
+const ATCS_SCALE = {
+
+    /*
+       This is intentionally independent of the old temporary
+       territory viewport.
+
+       We will replace the numerical anchors with verified
+       territory data as the actual railroad is built.
+    */
+
+    westMP: 507,
+
+    eastMP: 402,
+
+    pixelsPerMile: 68,
+
+    mileToX(mp) {
+
+        return (
+            (this.westMP - Number(mp)) *
+            this.pixelsPerMile
+        ) + 80;
+    },
+
+    xToMile(x) {
+
+        return this.westMP -
+            ((Number(x) - 80) /
+            this.pixelsPerMile);
+    }
+};
+
+
+/* ============================================================
+   6.3 BOARD ELEMENT CREATION
+   ============================================================ */
+
+function createATCSElement(tag, className) {
+
+    const element =
+        document.createElement(tag);
+
+    element.className =
+        className || "";
+
+    return element;
+}
+
+
+/* ============================================================
+   6.4 FIND / CREATE BOARD
+   ============================================================ */
+
+function getATCSBoard() {
+
+    let board =
+        document.getElementById(
+            "control-point-atcs-board"
+        );
+
+    if (board) {
+        return board;
+    }
+
+    board =
+        createATCSElement(
+            "div",
+            "control-point-atcs-board"
+        );
+
+    board.id =
+        "control-point-atcs-board";
+
+    board.style.position =
+        "relative";
+
+    board.style.width =
+        "100%";
+
+    board.style.height =
+        "430px";
+
+    board.style.background =
+        ATCS_BOARD.colors.background;
+
+    board.style.overflow =
+        "auto";
+
+    board.style.overflowY =
+        "hidden";
+
+    board.style.border =
+        "1px solid #252525";
+
+    board.style.boxSizing =
+        "border-box";
+
+    /*
+       The board should be placed in the main game area.
+
+       If the original territory viewport exists, use it.
+    */
+
+    const existing =
+        document.getElementById(
+            "territory-viewport"
+        );
+
+    if (existing) {
+
+        existing.innerHTML = "";
+
+        existing.appendChild(board);
+
+    } else {
+
+        document.body.appendChild(board);
+    }
+
+    return board;
+}
+
+
+/* ============================================================
+   6.5 BOARD CANVAS
+   ============================================================ */
+
+function createATCSCanvas() {
+
+    const board =
+        getATCSBoard();
+
+    let canvas =
+        document.getElementById(
+            "control-point-atcs-canvas"
+        );
+
+    if (canvas) {
+        return canvas;
+    }
+
+    canvas =
+        document.createElement("canvas");
+
+    canvas.id =
+        "control-point-atcs-canvas";
+
+    canvas.width =
+        ATCS_BOARD.width;
+
+    canvas.height =
+        420;
+
+    canvas.style.width =
+        ATCS_BOARD.width + "px";
+
+    canvas.style.height =
+        "420px";
+
+    canvas.style.display =
+        "block";
+
+    canvas.style.background =
+        "#000000";
+
+    board.appendChild(canvas);
+
+    return canvas;
+}
+
+
+/* ============================================================
+   6.6 DRAWING CONTEXT
+   ============================================================ */
+
+function getATCSContext() {
+
+    const canvas =
+        createATCSCanvas();
+
+    return canvas.getContext("2d");
+}
+
+
+/* ============================================================
+   6.7 DRAW BASE TRACKS
+   ============================================================ */
+
+function drawATCSBaseTracks(ctx) {
+
+    ctx.save();
+
+    ctx.lineWidth =
+        ATCS_BOARD.trackHeight;
+
+    ctx.strokeStyle =
+        ATCS_BOARD.colors.track;
+
+    /*
+       Main Track 1
+    */
+
+    drawTrackLine(
+        ctx,
+        ATCS_BOARD.trackRows.main1
+    );
+
+    /*
+       Main Track 2
+    */
+
+    drawTrackLine(
+        ctx,
+        ATCS_BOARD.trackRows.main2
+    );
+
+    /*
+       Siding
+    */
+
+    drawTrackLine(
+        ctx,
+        ATCS_BOARD.trackRows.siding
+    );
+
+    /*
+       Additional schematic track rows.
+       These allow territory data to represent areas where
+       more controlled tracks exist without drawing yards.
+    */
+
+    drawTrackLine(
+        ctx,
+        ATCS_BOARD.trackRows.main3
+    );
+
+    drawTrackLine(
+        ctx,
+        ATCS_BOARD.trackRows.main4
+    );
+
+    ctx.restore();
+}
+
+
+function drawTrackLine(ctx, y) {
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+        0,
+        y
+    );
+
+    ctx.lineTo(
+        ATCS_BOARD.width,
+        y
+    );
+
+    ctx.stroke();
+}
+
+
+/* ============================================================
+   6.8 DRAW TRACK LABELS
+   ============================================================ */
+
+function drawTrackLabels(ctx) {
+
+    ctx.save();
+
+    ctx.font =
+        "10px monospace";
+
+    ctx.fillStyle =
+        "#777";
+
+    ctx.textBaseline =
+        "middle";
+
+    ctx.fillText(
+        "1",
+        10,
+        ATCS_BOARD.trackRows.main1
+    );
+
+    ctx.fillText(
+        "2",
+        10,
+        ATCS_BOARD.trackRows.main2
+    );
+
+    ctx.fillText(
+        "S",
+        10,
+        ATCS_BOARD.trackRows.siding
+    );
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.9 TERRITORY LOCATIONS
+   ============================================================ */
+
+const ATCS_LOCATIONS = [
+
+    {
+        name: "CP 502",
+        mp: 502.8,
+        type: "cp"
+    },
+
+    {
+        name: "HICK",
+        mp: 503.4,
+        type: "cp"
+    },
+
+    {
+        name: "HBD-DED",
+        mp: 505.5,
+        type: "detector"
+    },
+
+    {
+        name: "CP 505",
+        mp: 505.9,
+        type: "cp"
+    },
+
+    {
+        name: "CP 506",
+        mp: 506.5,
+        type: "cp"
+    },
+
+    {
+        name: "CP 507",
+        mp: 507.2,
+        type: "cp"
+    },
+
+    {
+        name: "Colehour",
+        mp: 508.0,
+        type: "yard"
+    },
+
+    {
+        name: "CP 482",
+        mp: 482.2,
+        type: "cp"
+    },
+
+    {
+        name: "Chesterton",
+        mp: 481.1,
+        type: "town"
+    },
+
+    {
+        name: "Burdick",
+        mp: 476.8,
+        type: "town"
+    },
+
+    {
+        name: "Otis",
+        mp: 473.4,
+        type: "town"
+    },
+
+    {
+        name: "Pinola",
+        mp: 467.5,
+        type: "town"
+    },
+
+    {
+        name: "CP 466",
+        mp: 466.6,
+        type: "cp"
+    },
+
+    {
+        name: "CP 463",
+        mp: 463.8,
+        type: "cp"
+    },
+
+    {
+        name: "La Porte",
+        mp: 463.4,
+        type: "town"
+    },
+
+    {
+        name: "CP 462",
+        mp: 462.4,
+        type: "cp"
+    },
+
+    {
+        name: "Rolling Prairie",
+        mp: 456.4,
+        type: "town"
+    },
+
+    {
+        name: "New Carlisle",
+        mp: 450.1,
+        type: "town"
+    },
+
+    {
+        name: "CP 448",
+        mp: 448.6,
+        type: "cp"
+    },
+
+    {
+        name: "Terre Coupee",
+        mp: 448.4,
+        type: "town"
+    },
+
+    {
+        name: "Lydick",
+        mp: 443.7,
+        type: "town"
+    },
+
+    {
+        name: "South Bend",
+        mp: 438.5,
+        type: "town"
+    },
+
+    {
+        name: "CP 437",
+        mp: 437.5,
+        type: "cp"
+    },
+
+    {
+        name: "CP 435",
+        mp: 435.4,
+        type: "cp"
+    },
+
+    {
+        name: "Mishawaka",
+        mp: 432.7,
+        type: "town"
+    },
+
+    {
+        name: "CP 426",
+        mp: 426.4,
+        type: "cp"
+    },
+
+    {
+        name: "CP 423",
+        mp: 423.1,
+        type: "cp"
+    },
+
+    {
+        name: "Elkhart",
+        mp: 421.6,
+        type: "town"
+    },
+
+    {
+        name: "CP 421",
+        mp: 421.5,
+        type: "cp"
+    }
+];
+
+
+/* ============================================================
+   6.10 DRAW LOCATION MARKERS
+   ============================================================ */
+
+function drawATCSLocations(ctx) {
+
+    ctx.save();
+
+    ctx.textAlign =
+        "center";
+
+    ctx.textBaseline =
+        "top";
+
+    for (
+        const location
+        of ATCS_LOCATIONS
+    ) {
+
+        const x =
+            ATCS_SCALE.mileToX(
+                location.mp
+            );
+
+        /*
+           Keep location labels compact.
+        */
+
+        ctx.font =
+            location.type === "cp"
+                ? "bold 10px monospace"
+                : "10px monospace";
+
+        ctx.fillStyle =
+            location.type === "cp"
+                ? ATCS_BOARD.colors.location
+                : ATCS_BOARD.colors.text;
+
+        ctx.fillText(
+            location.name,
+            x,
+            16
+        );
+
+        /*
+           Milepost beneath location.
+        */
+
+        ctx.font =
+            "8px monospace";
+
+        ctx.fillStyle =
+            ATCS_BOARD.colors.milepost;
+
+        ctx.fillText(
+            "MP " +
+            Number(location.mp).toFixed(1),
+            x,
+            29
+        );
+
+        /*
+           Vertical location tick.
+        */
+
+        ctx.strokeStyle =
+            "#333";
+
+        ctx.lineWidth =
+            1;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x,
+            42
+        );
+
+        ctx.lineTo(
+            x,
+            365
+        );
+
+        ctx.stroke();
+
+        /*
+           Clickable control point overlay.
+        */
+
+        if (
+            location.type === "cp"
+        ) {
+
+            createLocationHitArea(
+                location
+            );
+        }
+    }
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.11 HIT AREAS
+   ============================================================ */
+
+function getATCSHitLayer() {
+
+    const board =
+        getATCSBoard();
+
+    let layer =
+        document.getElementById(
+            "control-point-atcs-hit-layer"
+        );
+
+    if (layer) {
+        return layer;
+    }
+
+    layer =
+        document.createElement("div");
+
+    layer.id =
+        "control-point-atcs-hit-layer";
+
+    layer.style.position =
+        "absolute";
+
+    layer.style.left =
+        "0";
+
+    layer.style.top =
+        "0";
+
+    layer.style.width =
+        ATCS_BOARD.width + "px";
+
+    layer.style.height =
+        "420px";
+
+    layer.style.pointerEvents =
+        "none";
+
+    board.appendChild(layer);
+
+    return layer;
+}
+
+
+function createLocationHitArea(location) {
+
+    const layer =
+        getATCSHitLayer();
+
+    const x =
+        ATCS_SCALE.mileToX(
+            location.mp
+        );
+
+    const existing =
+        layer.querySelector(
+            `[data-atcs-location="${location.name}"]`
+        );
+
+    if (existing) {
+        return;
+    }
+
+    const hit =
+        document.createElement("button");
+
+    hit.dataset.atcsLocation =
+        location.name;
+
+    hit.dataset.controlPoint =
+        location.name;
+
+    hit.style.position =
+        "absolute";
+
+    hit.style.left =
+        (x - 18) + "px";
+
+    hit.style.top =
+        "5px";
+
+    hit.style.width =
+        "36px";
+
+    hit.style.height =
+        "38px";
+
+    hit.style.padding =
+        "0";
+
+    hit.style.border =
+        "0";
+
+    hit.style.background =
+        "transparent";
+
+    hit.style.pointerEvents =
+        "auto";
+
+    hit.style.cursor =
+        "pointer";
+
+    hit.title =
+        location.name +
+        " MP " +
+        location.mp;
+
+    hit.addEventListener(
+        "click",
+        event => {
+
+            event.stopPropagation();
+
+            selectControlPoint(
+                location.name
+            );
+        }
+    );
+
+    layer.appendChild(hit);
+}
+
+
+/* ============================================================
+   6.12 SIGNAL DATA
+   ============================================================ */
+
+/*
+   These are DISPLAY SIGNAL OBJECTS.
+
+   They are intentionally kept separate from the final
+   verified railroad signal database.
+
+   Part 6 establishes the renderer. Part 7+ will replace
+   temporary/placeholder signal positions with verified
+   territory infrastructure.
+*/
+
+const ATCS_DISPLAY_SIGNALS = [
+
+    {
+        id: "SIG-W-01",
+        mp: 503.0,
+        track: "main1",
+        direction: "WEST"
+    },
+
+    {
+        id: "SIG-E-01",
+        mp: 503.0,
+        track: "main1",
+        direction: "EAST"
+    },
+
+    {
+        id: "SIG-W-02",
+        mp: 504.8,
+        track: "main2",
+        direction: "WEST"
+    },
+
+    {
+        id: "SIG-E-02",
+        mp: 504.8,
+        track: "main2",
+        direction: "EAST"
+    }
+];
+
+
+/* ============================================================
+   6.13 SIGNAL POSITION
+   ============================================================ */
+
+function getTrackY(track) {
+
+    switch (track) {
+
+        case "main1":
+            return ATCS_BOARD.trackRows.main1;
+
+        case "main2":
+            return ATCS_BOARD.trackRows.main2;
+
+        case "siding":
+            return ATCS_BOARD.trackRows.siding;
+
+        case "main3":
+            return ATCS_BOARD.trackRows.main3;
+
+        case "main4":
+            return ATCS_BOARD.trackRows.main4;
+
+        default:
+            return ATCS_BOARD.trackRows.main1;
+    }
+}
+
+
+/* ============================================================
+   6.14 SIGNAL RENDER
+   ============================================================ */
+
+function drawATCSSignals(ctx) {
+
+    ctx.save();
+
+    for (
+        const signal
+        of ATCS_DISPLAY_SIGNALS
+    ) {
+
+        const x =
+            ATCS_SCALE.mileToX(
+                signal.mp
+            );
+
+        const y =
+            getTrackY(
+                signal.track
+            );
+
+        let indication =
+            "STOP";
+
+        /*
+           Ask Part 3's signal engine first.
+        */
+
+        try {
+
+            if (
+                typeof getSignalIndication ===
+                "function"
+            ) {
+
+                indication =
+                    getSignalIndication(
+                        signal.id
+                    ) || "STOP";
+            }
+
+        } catch (e) {}
+
+        /*
+           If dispatcher is holding it, force Stop.
+        */
+
+        if (
+            CP.dispatcher &&
+            CP.dispatcher.heldSignals &&
+            CP.dispatcher.heldSignals[
+                signal.id
+            ]
+        ) {
+
+            indication =
+                "STOP";
+        }
+
+        const aspect =
+            getATCSAspectColor(
+                indication
+            );
+
+        /*
+           Signal mast.
+        */
+
+        ctx.strokeStyle =
+            "#777";
+
+        ctx.lineWidth =
+            1;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x,
+            y
+        );
+
+        ctx.lineTo(
+            x,
+            y - ATCS_BOARD.signalHeight
+        );
+
+        ctx.stroke();
+
+        /*
+           Signal lamp.
+        */
+
+        ctx.beginPath();
+
+        ctx.arc(
+            x,
+            y - ATCS_BOARD.signalHeight,
+            3,
+            0,
+            Math.PI * 2
+        );
+
+        ctx.fillStyle =
+            aspect;
+
+        ctx.fill();
+
+        /*
+           Tiny signal ID.
+        */
+
+        ctx.font =
+            "7px monospace";
+
+        ctx.fillStyle =
+            "#777";
+
+        ctx.textAlign =
+            "center";
+
+        ctx.fillText(
+            signal.id,
+            x,
+            y + 7
+        );
+    }
+
+    ctx.restore();
+}
+
+
+function getATCSAspectColor(indication) {
+
+    const value =
+        String(
+            indication || "STOP"
+        ).toUpperCase();
+
+    if (
+        value === "STOP" ||
+        value === "RESTRICTING"
+    ) {
+
+        return "#e32626";
+    }
+
+    if (
+        value.includes("APPROACH")
+    ) {
+
+        return "#e6c928";
+    }
+
+    return "#20e85a";
+}
+
+
+/* ============================================================
+   6.15 SWITCH RENDERING
+   ============================================================ */
+
+function drawATCSSwitches(ctx) {
+
+    const switches =
+        typeof SWITCHES !== "undefined" &&
+        Array.isArray(SWITCHES)
+            ? SWITCHES
+            : [];
+
+    ctx.save();
+
+    ctx.lineWidth =
+        1;
+
+    for (
+        const sw
+        of switches
+    ) {
+
+        if (
+            !Number.isFinite(
+                Number(sw.mp)
+            )
+        ) {
+            continue;
+        }
+
+        const x =
+            ATCS_SCALE.mileToX(
+                sw.mp
+            );
+
+        const y =
+            getTrackY(
+                sw.track ||
+                "main1"
+            );
+
+        const position =
+            String(
+                sw.position ||
+                sw.state ||
+                "NORMAL"
+            ).toUpperCase();
+
+        ctx.strokeStyle =
+            ATCS_BOARD.colors.switch;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x - 7,
+            y
+        );
+
+        if (
+            position === "REVERSE"
+        ) {
+
+            ctx.lineTo(
+                x + 7,
+                y + 12
+            );
+
+        } else {
+
+            ctx.lineTo(
+                x + 7,
+                y
+            );
+        }
+
+        ctx.stroke();
+
+        /*
+           Clickable switch hit area is handled by the DOM
+           overlay later.
+        */
+    }
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.16 SPEED RESTRICTIONS
+   ============================================================ */
+
+const ATCS_SPEED_RESTRICTIONS = [
+
+    /*
+       Historical/reference values currently loaded only where
+       useful for the renderer.
+
+       These are NOT claimed to be the current operating rule.
+       Final current speed data belongs in the territory database.
+    */
+
+    {
+        from: 486.7,
+        to: 497.7,
+        speed: 60
+    },
+
+    {
+        from: 492.1,
+        to: 497.7,
+        speed: 50
+    },
+
+    {
+        from: 512.1,
+        to: 512.3,
+        speed: 15
+    }
+];
+
+
+function drawATCSSpeedRestrictions(ctx) {
+
+    ctx.save();
+
+    ctx.font =
+        "8px monospace";
+
+    ctx.fillStyle =
+        ATCS_BOARD.colors.restriction;
+
+    ctx.textAlign =
+        "center";
+
+    for (
+        const restriction
+        of ATCS_SPEED_RESTRICTIONS
+    ) {
+
+        const x1 =
+            ATCS_SCALE.mileToX(
+                restriction.from
+            );
+
+        const x2 =
+            ATCS_SCALE.mileToX(
+                restriction.to
+            );
+
+        const x =
+            (x1 + x2) / 2;
+
+        ctx.fillText(
+            restriction.speed +
+            " MPH",
+            x,
+            382
+        );
+    }
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.17 ROUTE COLORING
+   ============================================================ */
+
+function drawATCSRoutes(ctx) {
+
+    const activeRoutes =
+        CP.dispatcher &&
+        CP.dispatcher.activeRoutes
+            ? Object.values(
+                CP.dispatcher.activeRoutes
+            )
+            : [];
+
+    ctx.save();
+
+    ctx.lineWidth =
+        3;
+
+    for (
+        const route
+        of activeRoutes
+    ) {
+
+        if (!route) {
+            continue;
+        }
+
+        /*
+           Route data may eventually contain a list of
+           milepost points.
+
+           Example:
+
+              route.points = [
+                  {mp: 421.5, track:"main1"},
+                  {mp: 423.1, track:"main1"}
+              ]
+
+           Until then, use route start/end MP if available.
+        */
+
+        let points =
+            Array.isArray(route.points)
+                ? route.points
+                : null;
+
+        if (
+            !points &&
+            Number.isFinite(
+                Number(route.fromMP)
+            ) &&
+            Number.isFinite(
+                Number(route.toMP)
+            )
+        ) {
+
+            points = [
+                {
+                    mp: route.fromMP,
+                    track:
+                        route.track ||
+                        "main1"
+                },
+
+                {
+                    mp: route.toMP,
+                    track:
+                        route.track ||
+                        "main1"
+                }
+            ];
+        }
+
+        if (
+            !points ||
+            points.length < 2
+        ) {
+            continue;
+        }
+
+        ctx.strokeStyle =
+            ATCS_BOARD.colors.route;
+
+        ctx.beginPath();
+
+        points.forEach(
+            (point, index) => {
+
+                const x =
+                    ATCS_SCALE.mileToX(
+                        point.mp
+                    );
+
+                const y =
+                    getTrackY(
+                        point.track ||
+                        "main1"
+                    );
+
+                if (index === 0) {
+
+                    ctx.moveTo(
+                        x,
+                        y
+                    );
+
+                } else {
+
+                    ctx.lineTo(
+                        x,
+                        y
+                    );
+                }
+            }
+        );
+
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.18 TRAIN OCCUPANCY
+   ============================================================ */
+
+function drawATCSTrainOccupancy(ctx) {
+
+    const trains =
+        typeof CP !== "undefined" &&
+        Array.isArray(CP.trains)
+            ? CP.trains
+            : [];
+
+    ctx.save();
+
+    ctx.lineWidth =
+        4;
+
+    ctx.strokeStyle =
+        ATCS_BOARD.colors.occupied;
+
+    for (
+        const train
+        of trains
+    ) {
+
+        if (
+            !Number.isFinite(
+                Number(train.mp)
+            )
+        ) {
+            continue;
+        }
+
+        const frontMP =
+            Number(train.mp);
+
+        /*
+           Train length in feet.
+           Approximate conversion:
+              5280 feet = 1 mile
+        */
+
+        const lengthFeet =
+            Number.isFinite(
+                Number(train.length)
+            )
+                ? Number(train.length)
+                : 8000;
+
+        const lengthMiles =
+            lengthFeet / 5280;
+
+        const rearMP =
+            Number.isFinite(
+                Number(train.rearMP)
+            )
+                ? Number(train.rearMP)
+                : (
+                    String(
+                        train.direction ||
+                        ""
+                    ).toUpperCase()
+                    .includes("EAST")
+                        ? frontMP + lengthMiles
+                        : frontMP - lengthMiles
+                );
+
+        const xFront =
+            ATCS_SCALE.mileToX(
+                frontMP
+            );
+
+        const xRear =
+            ATCS_SCALE.mileToX(
+                rearMP
+            );
+
+        const y =
+            getTrackY(
+                train.track ||
+                "main1"
+            );
+
+        /*
+           The red occupancy line represents the physical
+           train occupancy, not merely the next signal.
+        */
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            Math.min(
+                xFront,
+                xRear
+            ),
+            y
+        );
+
+        ctx.lineTo(
+            Math.max(
+                xFront,
+                xRear
+            ),
+            y
+        );
+
+        ctx.stroke();
+
+        /*
+           Train symbol.
+        */
+
+        ctx.font =
+            "bold 9px monospace";
+
+        ctx.fillStyle =
+            ATCS_BOARD.colors.occupied;
+
+        ctx.textAlign =
+            "center";
+
+        ctx.fillText(
+            train.id ||
+            train.symbol ||
+            "TRAIN",
+            (xFront + xRear) / 2,
+            y - 7
+        );
+    }
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.19 MILEPOST RULER
+   ============================================================ */
+
+function drawATCSMilepostRuler(ctx) {
+
+    ctx.save();
+
+    ctx.strokeStyle =
+        "#222";
+
+    ctx.fillStyle =
+        "#666";
+
+    ctx.lineWidth =
+        1;
+
+    ctx.font =
+        "8px monospace";
+
+    ctx.textAlign =
+        "center";
+
+    const start =
+        Math.ceil(
+            ATCS_SCALE.eastMP
+        );
+
+    const end =
+        Math.floor(
+            ATCS_SCALE.westMP
+        );
+
+    for (
+        let mp = start;
+        mp <= end;
+        mp++
+    ) {
+
+        const x =
+            ATCS_SCALE.mileToX(
+                mp
+            );
+
+        if (
+            x < 0 ||
+            x > ATCS_BOARD.width
+        ) {
+            continue;
+        }
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x,
+            395
+        );
+
+        ctx.lineTo(
+            x,
+            401
+        );
+
+        ctx.stroke();
+
+        /*
+           Every five miles gets a larger marker.
+        */
+
+        if (
+            mp % 5 === 0
+        ) {
+
+            ctx.beginPath();
+
+            ctx.moveTo(
+                x,
+                392
+            );
+
+            ctx.lineTo(
+                x,
+                404
+            );
+
+            ctx.stroke();
+
+            ctx.fillText(
+                String(mp),
+                x,
+                413
+            );
+        }
+    }
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.20 BOARD FRAME LABEL
+   ============================================================ */
+
+function drawATCSHeader(ctx) {
+
+    ctx.save();
+
+    ctx.font =
+        "bold 10px monospace";
+
+    ctx.fillStyle =
+        "#aaa";
+
+    ctx.textAlign =
+        "left";
+
+    ctx.fillText(
+        "CONTROL POINT",
+        10,
+        8
+    );
+
+    ctx.font =
+        "8px monospace";
+
+    ctx.fillStyle =
+        "#555";
+
+    ctx.fillText(
+        "DISPATCHER TERRITORY",
+        115,
+        8
+    );
+
+    ctx.restore();
+}
+
+
+/* ============================================================
+   6.21 COMPLETE BOARD RENDER
+   ============================================================ */
+
+function renderATCSBoard() {
+
+    const canvas =
+        createATCSCanvas();
+
+    const ctx =
+        canvas.getContext("2d");
+
+    /*
+       Clear.
+    */
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    /*
+       Black background.
+    */
+
+    ctx.fillStyle =
+        ATCS_BOARD.colors.background;
+
+    ctx.fillRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    /*
+       Layer order matters.
+    */
+
+    drawATCSHeader(ctx);
+
+    drawATCSBaseTracks(ctx);
+
+    drawATCSRoutes(ctx);
+
+    drawATCSTrainOccupancy(ctx);
+
+    drawATCSSpeedRestrictions(ctx);
+
+    drawATCSSignals(ctx);
+
+    drawATCSSwitches(ctx);
+
+    drawATCSLocations(ctx);
+
+    drawTrackLabels(ctx);
+
+    drawATCSMilepostRuler(ctx);
+}
+
+
+/* ============================================================
+   6.22 BOARD REFRESH
+   ============================================================ */
+
+let atcsRenderTimer = null;
+
+function startATCSRenderer() {
+
+    if (atcsRenderTimer) {
+        return;
+    }
+
+    renderATCSBoard();
+
+    atcsRenderTimer =
+        setInterval(
+            () => {
+
+                renderATCSBoard();
+
+            },
+            250
+        );
+}
+
+
+/* ============================================================
+   6.23 RESIZE / VIEWPORT HANDLING
+   ============================================================ */
+
+function updateATCSViewport() {
+
+    const board =
+        getATCSBoard();
+
+    if (!board) {
+        return;
+    }
+
+    board.style.height =
+        "430px";
+
+    /*
+       Preserve horizontal scrolling.
+    */
+
+    board.style.overflowX =
+        "auto";
+
+    board.style.overflowY =
+        "hidden";
+}
+
+
+/* ============================================================
+   6.24 ATCS BOARD SCROLL POSITION
+   ============================================================ */
+
+function scrollATCSToMilepost(mp) {
+
+    const board =
+        getATCSBoard();
+
+    if (!board) {
+        return;
+    }
+
+    const x =
+        ATCS_SCALE.mileToX(
+            mp
+        );
+
+    board.scrollLeft =
+        Math.max(
+            0,
+            x - (
+                board.clientWidth / 2
+            )
+        );
+}
+
+
+/* ============================================================
+   6.25 DOUBLE CLICK NAVIGATION
+   ============================================================ */
+
+const atcsBoard =
+    getATCSBoard();
+
+atcsBoard.addEventListener(
+    "dblclick",
+    event => {
+
+        /*
+           Convert the screen position into territory MP.
+
+           This is useful for quickly navigating the board
+           during development.
+        */
+
+        const rect =
+            atcsBoard.getBoundingClientRect();
+
+        const x =
+            event.clientX -
+            rect.left +
+            atcsBoard.scrollLeft;
+
+        const mp =
+            ATCS_SCALE.xToMile(
+                x
+            );
+
+        console.log(
+            "CONTROL POINT territory position:",
+            mp.toFixed(1)
+        );
+    }
+);
+
+
+/* ============================================================
+   6.26 RIGHT CLICK BOARD MENU
+   ============================================================ */
+
+atcsBoard.addEventListener(
+    "contextmenu",
+    event => {
+
+        /*
+           Prevent the browser menu over the dispatcher board.
+        */
+
+        event.preventDefault();
+
+        const rect =
+            atcsBoard.getBoundingClientRect();
+
+        const x =
+            event.clientX -
+            rect.left +
+            atcsBoard.scrollLeft;
+
+        const mp =
+            ATCS_SCALE.xToMile(
+                x
+            );
+
+        dispatcherEvent(
+            `BOARD POSITION MP ${mp.toFixed(1)}`
+        );
+    }
+);
+
+
+/* ============================================================
+   6.27 MOBILE BOARD SUPPORT
+   ============================================================ */
+
+function enableATCSMobileMode() {
+
+    const board =
+        getATCSBoard();
+
+    board.style.touchAction =
+        "pan-x";
+
+    /*
+       The territory itself remains wide.
+
+       A phone sees only the portion currently in the viewport,
+       exactly as a dispatcher would pan across a long board.
+    */
+
+    const media =
+        window.matchMedia(
+            "(max-width: 700px)"
+        );
+
+    if (
+        media.matches
+    ) {
+
+        board.style.height =
+            "400px";
+    }
+}
+
+
+/* ============================================================
+   6.28 DATA ATTRIBUTES FOR FUTURE HTML OBJECTS
+   ============================================================ */
+
+function tagATCSBoardObjects() {
+
+    /*
+       These attributes allow the Part 5 dispatcher interaction
+       system to work with future DOM-rendered signals,
+       switches, trains, and control points.
+
+       Canvas remains the primary visual layer.
+    */
+
+    document
+        .querySelectorAll(
+            "[data-atcs-signal]"
+        )
+        .forEach(
+            element => {
+
+                element.dataset.cpSignal =
+                    element.dataset.atcsSignal;
+            }
+        );
+
+    document
+        .querySelectorAll(
+            "[data-atcs-switch]"
+        )
+        .forEach(
+            element => {
+
+                element.dataset.cpSwitch =
+                    element.dataset.atcsSwitch;
+            }
+        );
+
+    document
+        .querySelectorAll(
+            "[data-atcs-train]"
+        )
+        .forEach(
+            element => {
+
+                element.dataset.cpTrain =
+                    element.dataset.atcsTrain;
+            }
+        );
+}
+
+
+/* ============================================================
+   6.29 BOARD STATUS BAR
+   ============================================================ */
+
+function createATCSStatusBar() {
+
+    let status =
+        document.getElementById(
+            "cp-atcs-status"
+        );
+
+    if (status) {
+        return status;
+    }
+
+    status =
+        document.createElement("div");
+
+    status.id =
+        "cp-atcs-status";
+
+    status.style.height =
+        "24px";
+
+    status.style.background =
+        "#050505";
+
+    status.style.border =
+        "1px solid #222";
+
+    status.style.borderTop =
+        "0";
+
+    status.style.color =
+        "#777";
+
+    status.style.font =
+        "9px monospace";
+
+    status.style.display =
+        "flex";
+
+    status.style.alignItems =
+        "center";
+
+    status.style.padding =
+        "0 8px";
+
+    status.style.boxSizing =
+        "border-box";
+
+    status.innerHTML =
+        `
+        <span>
+            ATCS
+        </span>
+
+        <span style="
+            margin-left:14px;
+        ">
+            WHITE NORMAL
+        </span>
+
+        <span style="
+            margin-left:14px;
+            color:#20e85a;
+        ">
+            GREEN ROUTE
+        </span>
+
+        <span style="
+            margin-left:14px;
+            color:#e32626;
+        ">
+            RED OCCUPIED
+        </span>
+        `;
+
+    const board =
+        getATCSBoard();
+
+    board.parentElement.insertBefore(
+        status,
+        board.nextSibling
+    );
+}
+
+
+/* ============================================================
+   6.30 INITIALIZE ATCS BOARD
+   ============================================================ */
+
+function initializeATCSBoard() {
+
+    getATCSBoard();
+
+    createATCSCanvas();
+
+    createATCSStatusBar();
+
+    updateATCSViewport();
+
+    enableATCSMobileMode();
+
+    tagATCSBoardObjects();
+
+    renderATCSBoard();
+
+    startATCSRenderer();
+
+    dispatcherEvent(
+        "ATCS TERRITORY DISPLAY ONLINE"
+    );
+
+    dispatcherEvent(
+        "HORIZONTAL TERRITORY VIEW ENABLED"
+    );
+}
+
+
+/* ============================================================
+   6.31 START
+   ============================================================ */
+
+if (
+    document.readyState ===
+    "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeATCSBoard,
+        { once: true }
+    );
+
+} else {
+
+    initializeATCSBoard();
+}
+
+
+/* ============================================================
+   6.32 PUBLIC BOARD API
+   ============================================================ */
+
+window.CONTROL_POINT_ATCS = {
+
+    render:
+        renderATCSBoard,
+
+    scrollToMilepost:
+        scrollATCSToMilepost,
+
+    mileToX:
+        mp => ATCS_SCALE.mileToX(mp),
+
+    xToMile:
+        x => ATCS_SCALE.xToMile(x),
+
+    locations:
+        ATCS_LOCATIONS,
+
+    signals:
+        ATCS_DISPLAY_SIGNALS
+};
+
+
+/* ============================================================
+   6.33 DEVELOPMENT MESSAGE
+   ============================================================ */
+
+console.log(
+    "%cCONTROL POINT — PART 6 ONLINE",
+    "font-weight:bold;font-size:14px;"
+);
+
+console.log(
+    "ATCS-style territory renderer: ONLINE"
+);
+
+console.log(
+    "Horizontal territory scrolling: ONLINE"
+);
+
+console.log(
+    "Track state rendering: ONLINE"
+);
+
+console.log(
+    "Signal rendering: ONLINE"
+);
+
+console.log(
+    "Train occupancy rendering: ONLINE"
+);
+
+console.log(
+    "Territory milepost ruler: ONLINE"
+);
+
+
+/* ============================================================
+   END PART 6
+   ============================================================ */
+/* ============================================================
+   CONTROL POINT
+   PART 7 — RADIO + DISPATCHER CONVERSATION SYSTEM
+   ============================================================ */
+
+/*
+   RADIO PHILOSOPHY
+   -----------------
+
+   Trains initiate radio traffic.
+
+   The dispatcher does NOT automatically answer.
+
+   The player must answer the train.
+
+   Example:
+
+       35J Chicago, over.
+
+       [ANSWER 35J]
+
+       Chicago answering, over.
+
+       35J crew is on board, ready to depart, over.
+
+       [ANSWER 35J]
+
+       Dispatcher receives control choices.
+
+       [WAIT FOR ONE]
+       [WAIT FOR TWO]
+       [HOLD]
+       [SIGNAL INDICATION]
+
+   The train only moves when the dispatcher has provided
+   appropriate authority.
+
+   This system is event/state driven.
+*/
+
+
+/* ============================================================
+   7.1 RADIO SYSTEM STATE
+   ============================================================ */
+
+CP.radio = CP.radio || {};
+
+Object.assign(CP.radio, {
+
+    activeCalls: {},
+
+    pendingCalls: [],
+
+    completedCalls: [],
+
+    assignedVoices: {},
+
+    callCounter: 0,
+
+    lastCallTime: 0,
+
+    responseCooldown: 900,
+
+    conversationTimeout: 30000
+});
+
+
+/* ============================================================
+   7.2 RADIO VOICE ASSIGNMENT
+   ============================================================ */
+
+function assignCrewVoice(train) {
+
+    if (!train) {
+        return null;
+    }
+
+    const trainId =
+        train.id ||
+        train.symbol ||
+        ("TRAIN-" + Math.random());
+
+    /*
+       Once a voice is assigned to a train, it stays with
+       that train for the remainder of the run.
+    */
+
+    if (
+        CP.radio.assignedVoices[trainId]
+    ) {
+
+        return CP.radio.assignedVoices[trainId];
+    }
+
+    let voices = [];
+
+    if (
+        typeof CREW_VOICES !== "undefined" &&
+        Array.isArray(CREW_VOICES)
+    ) {
+
+        voices =
+            CREW_VOICES;
+    }
+
+    if (!voices.length) {
+
+        voices = [
+            "CREW-01",
+            "CREW-02",
+            "CREW-03",
+            "CREW-04",
+            "CREW-05"
+        ];
+    }
+
+    const voice =
+        voices[
+            Math.floor(
+                Math.random() *
+                voices.length
+            )
+        ];
+
+    CP.radio.assignedVoices[
+        trainId
+    ] = voice;
+
+    train.crewVoice =
+        voice;
+
+    return voice;
+}
+
+
+/* ============================================================
+   7.3 TRAIN RADIO ID
+   ============================================================ */
+
+function getTrainRadioID(train) {
+
+    if (!train) {
+        return "UNKNOWN";
+    }
+
+    return (
+        train.id ||
+        train.symbol ||
+        train.name ||
+        "UNKNOWN"
+    );
+}
+
+
+/* ============================================================
+   7.4 DISPATCHER TERRITORY
+   ============================================================ */
+
+const DISPATCHER_TERRITORIES = [
+
+    {
+        id: "CHICAGO",
+
+        name: "Chicago",
+
+        /*
+           Chicago-end territory.
+           Final exact boundaries will be tied to verified
+           territory infrastructure later.
+        */
+
+        westMP: 507,
+
+        eastMP: 421.5
+    },
+
+    {
+        id: "ELKHART",
+
+        name: "Elkhart",
+
+        westMP: 421.5,
+
+        eastMP: 402
+    }
+];
+
+
+/* ============================================================
+   7.5 GET DISPATCHER FOR TRAIN
+   ============================================================ */
+
+function getTrainDispatcher(train) {
+
+    if (!train) {
+        return null;
+    }
+
+    /*
+       Explicit dispatcher assignment wins.
+    */
+
+    if (train.dispatcherTerritory) {
+
+        const explicit =
+            DISPATCHER_TERRITORIES.find(
+                territory =>
+                    territory.id ===
+                    train.dispatcherTerritory
+            );
+
+        if (explicit) {
+            return explicit;
+        }
+    }
+
+    const mp =
+        Number(train.mp);
+
+    if (!Number.isFinite(mp)) {
+
+        return DISPATCHER_TERRITORIES[0];
+    }
+
+    /*
+       Chicago territory.
+    */
+
+    if (
+        mp <= 507 &&
+        mp >= 421.5
+    ) {
+
+        return DISPATCHER_TERRITORIES[0];
+    }
+
+    /*
+       Elkhart-side territory.
+
+       NOTE:
+       This boundary is an engine placeholder until the final
+       verified territory handoff is loaded.
+    */
+
+    if (
+        mp < 421.5 &&
+        mp >= 402
+    ) {
+
+        return DISPATCHER_TERRITORIES[1];
+    }
+
+    return DISPATCHER_TERRITORIES[0];
+}
+
+
+/* ============================================================
+   7.6 TRAIN RADIO STATE
+   ============================================================ */
+
+function initializeTrainRadio(train) {
+
+    if (!train) {
+        return;
+    }
+
+    const id =
+        getTrainRadioID(train);
+
+    assignCrewVoice(train);
+
+    if (!train.radioState) {
+
+        train.radioState = {
+
+            state: "QUIET",
+
+            dispatcher:
+                getTrainDispatcher(train),
+
+            waitingFor:
+                [],
+
+            holdReason:
+                null,
+
+            readyToDepart:
+                false,
+
+            signalReceived:
+                false,
+
+            lastCall:
+                0,
+
+            callAnswered:
+                false,
+
+            conversation:
+                []
+        };
+    }
+
+    /*
+       Dispatcher territory can change as the train moves.
+    */
+
+    train.radioState.dispatcher =
+        getTrainDispatcher(train);
+}
+
+
+/* ============================================================
+   7.7 RADIO MESSAGE OBJECT
+   ============================================================ */
+
+function createRadioMessage(
+    train,
+    speaker,
+    text,
+    type = "crew"
+) {
+
+    return {
+
+        id:
+            ++CP.radio.callCounter,
+
+        train:
+            getTrainRadioID(train),
+
+        speaker,
+
+        text,
+
+        type,
+
+        time:
+            Date.now()
+    };
+}
+
+
+/* ============================================================
+   7.8 RADIO DISPLAY
+   ============================================================ */
+
+function displayRadioMessage(message) {
+
+    if (!message) {
+        return;
+    }
+
+    /*
+       Existing event system.
+    */
+
+    try {
+
+        if (
+            typeof dispatcherEvent ===
+            "function"
+        ) {
+
+            dispatcherEvent(
+                `${message.speaker}: ${message.text}`
+            );
+        }
+
+    } catch (e) {}
+
+    /*
+       Dedicated radio panel.
+    */
+
+    let panel =
+        document.getElementById(
+            "cp-radio-live"
+        );
+
+    if (!panel) {
+
+        panel =
+            document.createElement(
+                "div"
+            );
+
+        panel.id =
+            "cp-radio-live";
+
+        panel.style.position =
+            "fixed";
+
+        panel.style.left =
+            "50%";
+
+        panel.style.bottom =
+            "12px";
+
+        panel.style.transform =
+            "translateX(-50%)";
+
+        panel.style.width =
+            "min(520px, calc(100vw - 30px))";
+
+        panel.style.background =
+            "rgba(0,0,0,.96)";
+
+        panel.style.border =
+            "1px solid #333";
+
+        panel.style.color =
+            "#ddd";
+
+        panel.style.fontFamily =
+            "monospace";
+
+        panel.style.fontSize =
+            "11px";
+
+        panel.style.zIndex =
+            "10000";
+
+        panel.style.boxShadow =
+            "0 6px 25px rgba(0,0,0,.7)";
+
+        document.body.appendChild(
+            panel
+        );
+    }
+
+    panel.innerHTML = `
+
+        <div style="
+            padding:6px 9px;
+            border-bottom:1px solid #333;
+            color:#888;
+            font-size:9px;
+            letter-spacing:.5px;
+        ">
+            RADIO
+        </div>
+
+        <div style="
+            padding:10px;
+        ">
+
+            <div style="
+                color:#777;
+                font-size:9px;
+                margin-bottom:3px;
+            ">
+                ${message.train}
+            </div>
+
+            <div style="
+                color:#fff;
+                font-weight:bold;
+                margin-bottom:4px;
+            ">
+                ${message.speaker}
+            </div>
+
+            <div>
+                ${message.text}
+            </div>
+
+        </div>
+    `;
+
+    /*
+       Fade old live message after a while.
+    */
+
+    clearTimeout(
+        panel.__radioTimeout
+    );
+
+    panel.__radioTimeout =
+        setTimeout(
+            () => {
+
+                if (panel) {
+
+                    panel.style.display =
+                        "none";
+                }
+
+            },
+            8000
+        );
+
+    panel.style.display =
+        "block";
+}
+
+
+/* ============================================================
+   7.9 CREW SPEECH
+   ============================================================ */
+
+function crewRadio(train, text, type = "crew") {
+
+    initializeTrainRadio(train);
+
+    const dispatcher =
+        getTrainDispatcher(train);
+
+    const dispatcherName =
+        dispatcher
+            ? dispatcher.name
+            : "Dispatch";
+
+    const message =
+        createRadioMessage(
+            train,
+            getTrainRadioID(train),
+            text,
+            type
+        );
+
+    train.radioState.conversation.push(
+        message
+    );
+
+    displayRadioMessage(
+        message
+    );
+
+    return message;
+}
+
+
+/* ============================================================
+   7.10 DISPATCHER SPEECH
+   ============================================================ */
+
+function dispatcherRadio(
+    train,
+    text,
+    type = "dispatcher"
+) {
+
+    initializeTrainRadio(train);
+
+    const dispatcher =
+        getTrainDispatcher(train);
+
+    const speaker =
+        dispatcher
+            ? dispatcher.name
+            : "Dispatcher";
+
+    const message =
+        createRadioMessage(
+            train,
+            speaker,
+            text,
+            type
+        );
+
+    train.radioState.conversation.push(
+        message
+    );
+
+    displayRadioMessage(
+        message
+    );
+
+    return message;
+}
+
+
+/* ============================================================
+   7.11 TRAIN CALL — INITIAL
+   ============================================================ */
+
+function trainCallDispatcher(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    const radio =
+        train.radioState;
+
+    /*
+       Don't repeatedly call every simulation tick.
+    */
+
+    if (
+        radio.state !== "QUIET"
+    ) {
+
+        return;
+    }
+
+    const dispatcher =
+        getTrainDispatcher(train);
+
+    const dispatcherName =
+        dispatcher
+            ? dispatcher.name
+            : "Chicago";
+
+    const id =
+        getTrainRadioID(train);
+
+    radio.state =
+        "CALLING_DISPATCHER";
+
+    radio.lastCall =
+        Date.now();
+
+    radio.callAnswered =
+        false;
+
+    crewRadio(
+        train,
+        `${id} ${dispatcherName}, over.`
+    );
+
+    createRadioAnswerButton(
+        train,
+        "ANSWER " + id,
+        "answerInitialTrainCall"
+    );
+}
+
+
+/* ============================================================
+   7.12 RADIO ANSWER BUTTON
+   ============================================================ */
+
+function createRadioAnswerButton(
+    train,
+    label,
+    handlerName
+) {
+
+    removeTrainRadioButtons();
+
+    const container =
+        document.createElement(
+            "div"
+        );
+
+    container.id =
+        "cp-radio-actions";
+
+    container.style.position =
+        "fixed";
+
+    container.style.left =
+        "50%";
+
+    container.style.bottom =
+        "82px";
+
+    container.style.transform =
+        "translateX(-50%)";
+
+    container.style.zIndex =
+        "10001";
+
+    container.style.display =
+        "flex";
+
+    container.style.gap =
+        "6px";
+
+    const button =
+        document.createElement(
+            "button"
+        );
+
+    button.textContent =
+        label;
+
+    button.style.background =
+        "#111";
+
+    button.style.border =
+        "1px solid #777";
+
+    button.style.color =
+        "#fff";
+
+    button.style.fontFamily =
+        "monospace";
+
+    button.style.fontSize =
+        "11px";
+
+    button.style.padding =
+        "8px 12px";
+
+    button.style.cursor =
+        "pointer";
+
+    button.dataset.train =
+        getTrainRadioID(train);
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            if (
+                typeof window[
+                    handlerName
+                ] === "function"
+            ) {
+
+                window[
+                    handlerName
+                ](train);
+            }
+
+            removeTrainRadioButtons();
+        }
+    );
+
+    container.appendChild(
+        button
+    );
+
+    document.body.appendChild(
+        container
+    );
+}
+
+
+function removeTrainRadioButtons() {
+
+    const existing =
+        document.getElementById(
+            "cp-radio-actions"
+        );
+
+    if (existing) {
+        existing.remove();
+    }
+}
+
+
+/* ============================================================
+   7.13 ANSWER INITIAL CALL
+   ============================================================ */
+
+function answerInitialTrainCall(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    const dispatcher =
+        getTrainDispatcher(train);
+
+    const dispatcherName =
+        dispatcher
+            ? dispatcher.name
+            : "Chicago";
+
+    train.radioState.state =
+        "AWAITING_CREW";
+
+    train.radioState.callAnswered =
+        true;
+
+    dispatcherRadio(
+        train,
+        `${dispatcherName} answering, over.`
+    );
+
+    /*
+       Small delay before crew responds.
+    */
+
+    setTimeout(
+        () => {
+
+            crewReadyToDepart(
+                train
+            );
+
+        },
+        900
+    );
+}
+
+
+/* ============================================================
+   7.14 CREW READY TO DEPART
+   ============================================================ */
+
+function crewReadyToDepart(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    const id =
+        getTrainRadioID(train);
+
+    train.radioState.state =
+        "CREW_READY";
+
+    train.radioState.readyToDepart =
+        true;
+
+    crewRadio(
+        train,
+        `${id} crew is on board, ready to depart, over.`
+    );
+
+    createDispatcherResponsePanel(
+        train
+    );
+}
+
+
+/* ============================================================
+   7.15 DISPATCHER RESPONSE PANEL
+   ============================================================ */
+
+function createDispatcherResponsePanel(
+    train
+) {
+
+    removeTrainRadioButtons();
+
+    const container =
+        document.createElement(
+            "div"
+        );
+
+    container.id =
+        "cp-radio-actions";
+
+    container.style.position =
+        "fixed";
+
+    container.style.left =
+        "50%";
+
+    container.style.bottom =
+        "82px";
+
+    container.style.transform =
+        "translateX(-50%)";
+
+    container.style.zIndex =
+        "10001";
+
+    container.style.display =
+        "flex";
+
+    container.style.flexWrap =
+        "wrap";
+
+    container.style.justifyContent =
+        "center";
+
+    container.style.gap =
+        "5px";
+
+    /*
+       Dispatcher can select how many trains must clear
+       before this train is released.
+    */
+
+    const options = [
+
+        {
+            label:
+                "SIGNAL INDICATION",
+
+            action:
+                "dispatcherGiveSignal"
+        },
+
+        {
+            label:
+                "WAIT FOR ONE",
+
+            action:
+                "dispatcherHoldForOne"
+        },
+
+        {
+            label:
+                "WAIT FOR TWO",
+
+            action:
+                "dispatcherHoldForTwo"
+        },
+
+        {
+            label:
+                "WAIT FOR THREE",
+
+            action:
+                "dispatcherHoldForThree"
+        },
+
+        {
+            label:
+                "HOLD",
+
+            action:
+                "dispatcherHoldTrain"
+        }
+    ];
+
+    options.forEach(
+        option => {
+
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+            button.textContent =
+                option.label;
+
+            button.style.background =
+                "#111";
+
+            button.style.border =
+                "1px solid #666";
+
+            button.style.color =
+                "#ddd";
+
+            button.style.fontFamily =
+                "monospace";
+
+            button.style.fontSize =
+                "10px";
+
+            button.style.padding =
+                "7px 9px";
+
+            button.style.cursor =
+                "pointer";
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    window[
+                        option.action
+                    ](train);
+
+                    removeTrainRadioButtons();
+                }
+            );
+
+            container.appendChild(
+                button
+            );
+        }
+    );
+
+    document.body.appendChild(
+        container
+    );
+}
+
+
+/* ============================================================
+   7.16 SIGNAL INDICATION
+   ============================================================ */
+
+function dispatcherGiveSignal(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    const id =
+        getTrainRadioID(train);
+
+    train.radioState.state =
+        "SIGNAL_AUTHORITY";
+
+    train.radioState.signalReceived =
+        true;
+
+    train.signalAuthority =
+        true;
+
+    /*
+       Ask existing Part 3 signal logic where possible.
+    */
+
+    let indication =
+        "CLEAR";
+
+    try {
+
+        if (
+            typeof getTrainAuthorizedSpeed ===
+            "function"
+        ) {
+
+            const speed =
+                getTrainAuthorizedSpeed(
+                    train
+                );
+
+            if (
+                Number.isFinite(speed)
+            ) {
+
+                if (speed === 0) {
+                    indication = "STOP";
+                }
+
+                else if (speed <= 15) {
+                    indication = "SLOW";
+                }
+
+                else if (speed <= 30) {
+                    indication = "MEDIUM";
+                }
+
+                else {
+                    indication = "CLEAR";
+                }
+            }
+        }
+
+    } catch (e) {}
+
+    train.radioSignal =
+        indication;
+
+    dispatcherRadio(
+        train,
+        `${id} signal indication, over.`
+    );
+
+    setTimeout(
+        () => {
+
+            crewRadio(
+                train,
+                `Signal indication, ${id}, over.`
+            );
+
+            train.radioState.state =
+                "MOVING_IF_AUTHORIZED";
+
+        },
+        650
+    );
+}
+
+
+/* ============================================================
+   7.17 WAIT FOR ONE
+   ============================================================ */
+
+function dispatcherHoldForOne(
+    train
+) {
+
+    setTrainWaitCount(
+        train,
+        1
+    );
+}
+
+
+/* ============================================================
+   7.18 WAIT FOR TWO
+   ============================================================ */
+
+function dispatcherHoldForTwo(
+    train
+) {
+
+    setTrainWaitCount(
+        train,
+        2
+    );
+}
+
+
+/* ============================================================
+   7.19 WAIT FOR THREE
+   ============================================================ */
+
+function dispatcherHoldForThree(
+    train
+) {
+
+    setTrainWaitCount(
+        train,
+        3
+    );
+}
+
+
+/* ============================================================
+   7.20 SET TRAIN WAIT COUNT
+   ============================================================ */
+
+function setTrainWaitCount(
+    train,
+    count
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    const id =
+        getTrainRadioID(train);
+
+    train.radioState.state =
+        "WAITING_FOR_TRAINS";
+
+    train.radioState.waitingFor =
+        [];
+
+    train.radioState.waitCount =
+        count;
+
+    train.signalAuthority =
+        false;
+
+    train.radioSignal =
+        "WAIT";
+
+    /*
+       Find trains that are relevant to the hold.
+
+       We prefer trains physically approaching the same
+       control point / yard interface.
+    */
+
+    const candidates =
+        getCandidateConflictingTrains(
+            train
+        );
+
+    train.radioState.waitingFor =
+        candidates
+            .slice(
+                0,
+                count
+            )
+            .map(
+                other =>
+                    getTrainRadioID(
+                        other
+                    )
+            );
+
+    if (
+        train.radioState.waitingFor.length ===
+        0
+    ) {
+
+        /*
+           If no train currently exists, the instruction still
+           becomes a real waiting state. The dispatcher can
+           later release the train.
+        */
+
+        dispatcherRadio(
+            train,
+            `${id} waiting for ${count} train${count > 1 ? "s" : ""}, over.`
+        );
+
+    } else {
+
+        dispatcherRadio(
+            train,
+            `${id} signal indication, waiting for ${count} train${count > 1 ? "s" : ""}, over.`
+        );
+    }
+
+    setTimeout(
+        () => {
+
+            crewRadio(
+                train,
+                `Waiting for ${count} train${count > 1 ? "s" : ""}, ${id}, over.`
+            );
+
+        },
+        650
+    );
+}
+
+
+/* ============================================================
+   7.21 HOLD TRAIN
+   ============================================================ */
+
+function dispatcherHoldTrain(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    const id =
+        getTrainRadioID(train);
+
+    train.radioState.state =
+        "DISPATCHER_HOLD";
+
+    train.radioState.holdReason =
+        "DISPATCHER";
+
+    train.signalAuthority =
+        false;
+
+    train.radioSignal =
+        "STOP";
+
+    dispatcherRadio(
+        train,
+        `${id} hold your position, over.`
+    );
+
+    setTimeout(
+        () => {
+
+            crewRadio(
+                train,
+                `Holding position, ${id}, over.`
+            );
+
+        },
+        650
+    );
+}
+
+
+/* ============================================================
+   7.22 FIND CONFLICTING TRAINS
+   ============================================================ */
+
+function getCandidateConflictingTrains(
+    train
+) {
+
+    if (
+        typeof CP === "undefined" ||
+        !Array.isArray(CP.trains)
+    ) {
+
+        return [];
+    }
+
+    const trainMP =
+        Number(train.mp);
+
+    const direction =
+        String(
+            train.direction ||
+            ""
+        ).toUpperCase();
+
+    const candidates =
+        CP.trains.filter(
+            other => {
+
+                if (
+                    !other ||
+                    other === train
+                ) {
+                    return false;
+                }
+
+                const otherMP =
+                    Number(other.mp);
+
+                if (
+                    !Number.isFinite(
+                        otherMP
+                    ) ||
+                    !Number.isFinite(
+                        trainMP
+                    )
+                ) {
+                    return false;
+                }
+
+                /*
+                   Same dispatcher territory.
+                */
+
+                const dispatcherA =
+                    getTrainDispatcher(
+                        train
+                    );
+
+                const dispatcherB =
+                    getTrainDispatcher(
+                        other
+                    );
+
+                if (
+                    dispatcherA &&
+                    dispatcherB &&
+                    dispatcherA.id !==
+                    dispatcherB.id
+                ) {
+
+                    return false;
+                }
+
+                /*
+                   Nearby traffic is most relevant.
+
+                   This is a dispatching candidate list, not
+                   the final route-conflict engine.
+                */
+
+                const distance =
+                    Math.abs(
+                        trainMP -
+                        otherMP
+                    );
+
+                if (
+                    distance > 15
+                ) {
+
+                    return false;
+                }
+
+                return true;
+            }
+        );
+
+    /*
+       Closest first.
+    */
+
+    candidates.sort(
+        (
+            a,
+            b
+        ) =>
+            Math.abs(
+                Number(a.mp) -
+                trainMP
+            ) -
+            Math.abs(
+                Number(b.mp) -
+                trainMP
+            )
+    );
+
+    return candidates;
+}
+
+
+/* ============================================================
+   7.23 WAITING TRAIN UPDATE
+   ============================================================ */
+
+function updateTrainRadioWaiting(
+    train
+) {
+
+    if (!train || !train.radioState) {
+        return;
+    }
+
+    if (
+        train.radioState.state !==
+        "WAITING_FOR_TRAINS"
+    ) {
+
+        return;
+    }
+
+    const required =
+        Number(
+            train.radioState.waitCount ||
+            0
+        );
+
+    if (
+        required <= 0
+    ) {
+
+        return;
+    }
+
+    /*
+       Remove trains that have cleared the relevant area.
+    */
+
+    train.radioState.waitingFor =
+        train.radioState.waitingFor
+            .filter(
+                waitingId => {
+
+                    const waitingTrain =
+                        CP.trains.find(
+                            other =>
+                                getTrainRadioID(
+                                    other
+                                ) ===
+                                waitingId
+                        );
+
+                    if (!waitingTrain) {
+                        return false;
+                    }
+
+                    /*
+                       A train is considered clear when it is
+                       sufficiently separated from the waiting
+                       train.
+                    */
+
+                    const distance =
+                        Math.abs(
+                            Number(
+                                waitingTrain.mp
+                            ) -
+                            Number(
+                                train.mp
+                            )
+                        );
+
+                    return distance < 3;
+                }
+            );
+
+    /*
+       Once the required number of trains have cleared,
+       notify the dispatcher.
+    */
+
+    if (
+        train.radioState.waitingFor.length ===
+        0
+    ) {
+
+        train.radioState.state =
+            "CREW_READY";
+
+        train.radioState.waitingFor =
+            [];
+
+        train.radioState.waitCount =
+            0;
+
+        train.radioState.signalReceived =
+            false;
+
+        dispatcherEvent(
+            `${getTrainRadioID(train)} — HOLDING CONDITION CLEARED`
+        );
+
+        /*
+           Crew calls dispatcher again.
+        */
+
+        setTimeout(
+            () => {
+
+                crewRadio(
+                    train,
+                    `${getTrainRadioID(train)} ready for signal indication, over.`
+                );
+
+                createDispatcherResponsePanel(
+                    train
+                );
+
+            },
+            500
+        );
+    }
+}
+
+
+/* ============================================================
+   7.24 EMERGENCY RADIO
+   ============================================================ */
+
+function trainEmergencyCall(
+    train,
+    reason = "EMERGENCY"
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    const id =
+        getTrainRadioID(train);
+
+    train.radioState.state =
+        "EMERGENCY";
+
+    train.signalAuthority =
+        false;
+
+    train.radioSignal =
+        "STOP";
+
+    train.emergency =
+        true;
+
+    train.speed =
+        0;
+
+    crewRadio(
+        train,
+        `${id} is in emergency, emergency, emergency, over.`,
+        "emergency"
+    );
+
+    setTimeout(
+        () => {
+
+            dispatcherRadio(
+                train,
+                `${id}, understand you're in emergency. Hold your position, over.`,
+                "emergency"
+            );
+
+        },
+        700
+    );
+
+    setTimeout(
+        () => {
+
+            crewRadio(
+                train,
+                `Emergency application, ${reason}, ${id}, over.`,
+                "emergency"
+            );
+
+        },
+        1400
+    );
+}
+
+
+/* ============================================================
+   7.25 EMERGENCY BUTTON
+   ============================================================ */
+
+function createEmergencyDispatcherControl(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    /*
+       This control is primarily for testing the emergency
+       system while we build the final automatic event engine.
+    */
+
+    let button =
+        document.getElementById(
+            "cp-emergency-test"
+        );
+
+    if (button) {
+        return;
+    }
+
+    button =
+        document.createElement(
+            "button"
+        );
+
+    button.id =
+        "cp-emergency-test";
+
+    button.textContent =
+        "TEST EMERGENCY";
+
+    button.style.position =
+        "fixed";
+
+    button.style.top =
+        "70px";
+
+    button.style.right =
+        "10px";
+
+    button.style.zIndex =
+        "10000";
+
+    button.style.background =
+        "#111";
+
+    button.style.border =
+        "1px solid #555";
+
+    button.style.color =
+        "#bbb";
+
+    button.style.fontFamily =
+        "monospace";
+
+    button.style.fontSize =
+        "9px";
+
+    button.style.padding =
+        "4px 6px";
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            trainEmergencyCall(
+                train,
+                "simulated emergency"
+            );
+        }
+    );
+
+    document.body.appendChild(
+        button
+    );
+}
+
+
+/* ============================================================
+   7.26 AUTOMATIC RADIO START CONDITIONS
+   ============================================================ */
+
+function updateAutomaticTrainRadio(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    initializeTrainRadio(train);
+
+    /*
+       Don't interfere with emergencies.
+    */
+
+    if (
+        train.radioState.state ===
+        "EMERGENCY"
+    ) {
+
+        return;
+    }
+
+    /*
+       Don't interfere with an active conversation.
+    */
+
+    const activeStates = [
+
+        "CALLING_DISPATCHER",
+
+        "AWAITING_CREW",
+
+        "CREW_READY",
+
+        "WAITING_FOR_TRAINS",
+
+        "DISPATCHER_HOLD"
+    ];
+
+    if (
+        activeStates.includes(
+            train.radioState.state
+        )
+    ) {
+
+        return;
+    }
+
+    /*
+       Train stopped and not yet released:
+       initiate the dispatcher call.
+
+       We deliberately require a train to be near an
+       appropriate departure/interface point.
+
+       The final yard-interface database will replace this
+       generic condition.
+    */
+
+    const speed =
+        Number(
+            train.speed || 0
+        );
+
+    const stopped =
+        speed <= 0.5;
+
+    const notDeparted =
+        !train.hasDeparted;
+
+    if (
+        stopped &&
+        notDeparted &&
+        !train.emergency
+    ) {
+
+        /*
+           Prevent repeated calls.
+        */
+
+        const now =
+            Date.now();
+
+        if (
+            now -
+            train.radioState.lastCall >
+            15000
+        ) {
+
+            train.radioState.lastCall =
+                now;
+
+            trainCallDispatcher(
+                train
+            );
+        }
+    }
+}
+
+
+/* ============================================================
+   7.27 RADIO STATE UPDATE
+   ============================================================ */
+
+function updateRadioSystem() {
+
+    if (
+        typeof CP === "undefined" ||
+        !Array.isArray(CP.trains)
+    ) {
+
+        return;
+    }
+
+    CP.trains.forEach(
+        train => {
+
+            initializeTrainRadio(
+                train
+            );
+
+            updateTrainRadioWaiting(
+                train
+            );
+
+            updateAutomaticTrainRadio(
+                train
+            );
+        }
+    );
+}
+
+
+/* ============================================================
+   7.28 HOOK RADIO INTO SIMULATION
+   ============================================================ */
+
+(function installRadioSimulationHook() {
+
+    if (
+        window.__cpRadioHookInstalled
+    ) {
+
+        return;
+    }
+
+    const previous =
+        window.updateSimulation;
+
+    if (
+        typeof previous ===
+        "function"
+    ) {
+
+        window.updateSimulation =
+            function(...args) {
+
+                previous.apply(
+                    this,
+                    args
+                );
+
+                updateRadioSystem();
+            };
+
+        window.__cpRadioHookInstalled =
+            true;
+    }
+
+})();
+
+
+/* ============================================================
+   7.29 TRAIN DEPARTURE AUTHORITY
+   ============================================================ */
+
+function canTrainDepart(
+    train
+) {
+
+    if (!train) {
+        return false;
+    }
+
+    initializeTrainRadio(
+        train
+    );
+
+    const state =
+        train.radioState.state;
+
+    /*
+       Emergency = absolutely no movement.
+    */
+
+    if (
+        state ===
+        "EMERGENCY"
+    ) {
+
+        return false;
+    }
+
+    /*
+       Dispatcher hold = no movement.
+    */
+
+    if (
+        state ===
+        "DISPATCHER_HOLD"
+    ) {
+
+        return false;
+    }
+
+    /*
+       Waiting for trains = no movement.
+    */
+
+    if (
+        state ===
+        "WAITING_FOR_TRAINS"
+    ) {
+
+        return false;
+    }
+
+    /*
+       Signal authority must exist.
+    */
+
+    if (
+        !train.signalAuthority
+    ) {
+
+        return false;
+    }
+
+    /*
+       Signal must not be STOP.
+    */
+
+    const signal =
+        String(
+            train.radioSignal ||
+            ""
+        ).toUpperCase();
+
+    if (
+        signal === "STOP"
+    ) {
+
+        return false;
+    }
+
+    return true;
+}
+
+
+/* ============================================================
+   7.30 APPLY RADIO MOVEMENT AUTHORITY
+   ============================================================ */
+
+function applyRadioMovementAuthority(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    if (
+        canTrainDepart(
+            train
+        )
+    ) {
+
+        train.hasDeparted =
+            true;
+
+        /*
+           Don't force a speed here.
+
+           Part 4's physics engine determines acceleration,
+           braking, authorized speed, and actual position.
+        */
+
+        train.radioState.state =
+            "MOVING";
+
+        dispatcherEvent(
+            `${getTrainRadioID(train)} DEPARTURE AUTHORITY ACTIVE`
+        );
+    }
+}
+
+
+/* ============================================================
+   7.31 MOVEMENT AUTHORITY UPDATE
+   ============================================================ */
+
+(function installMovementAuthorityHook() {
+
+    if (
+        window.__cpRadioMovementHook
+    ) {
+
+        return;
+    }
+
+    const previous =
+        window.updateDispatcherControlLayer;
+
+    if (
+        typeof previous ===
+        "function"
+    ) {
+
+        window.updateDispatcherControlLayer =
+            function(...args) {
+
+                previous.apply(
+                    this,
+                    args
+                );
+
+                if (
+                    typeof CP !== "undefined" &&
+                    Array.isArray(
+                        CP.trains
+                    )
+                ) {
+
+                    CP.trains.forEach(
+                        applyRadioMovementAuthority
+                    );
+                }
+            };
+
+        window.__cpRadioMovementHook =
+            true;
+    }
+
+})();
+
+
+/* ============================================================
+   7.32 RADIO HISTORY PANEL
+   ============================================================ */
+
+function createRadioHistoryPanel() {
+
+    if (
+        document.getElementById(
+            "cp-radio-history"
+        )
+    ) {
+
+        return;
+    }
+
+    const panel =
+        document.createElement(
+            "div"
+        );
+
+    panel.id =
+        "cp-radio-history";
+
+    panel.style.position =
+        "fixed";
+
+    panel.style.top =
+        "70px";
+
+    panel.style.left =
+        "10px";
+
+    panel.style.width =
+        "300px";
+
+    panel.style.maxHeight =
+        "160px";
+
+    panel.style.overflow =
+        "hidden";
+
+    panel.style.background =
+        "rgba(0,0,0,.9)";
+
+    panel.style.border =
+        "1px solid #222";
+
+    panel.style.color =
+        "#aaa";
+
+    panel.style.font =
+        "9px monospace";
+
+    panel.style.zIndex =
+        "8000";
+
+    panel.style.pointerEvents =
+        "none";
+
+    document.body.appendChild(
+        panel
+    );
+}
+
+
+function updateRadioHistoryPanel() {
+
+    createRadioHistoryPanel();
+
+    const panel =
+        document.getElementById(
+            "cp-radio-history"
+        );
+
+    const trains =
+        typeof CP !== "undefined" &&
+        Array.isArray(CP.trains)
+            ? CP.trains
+            : [];
+
+    const messages = [];
+
+    trains.forEach(
+        train => {
+
+            if (
+                !train.radioState ||
+                !Array.isArray(
+                    train.radioState.conversation
+                )
+            ) {
+
+                return;
+            }
+
+            train.radioState.conversation
+                .slice(-3)
+                .forEach(
+                    message => {
+
+                        messages.push(
+                            message
+                        );
+                    }
+                );
+        }
+    );
+
+    messages.sort(
+        (a, b) =>
+            b.time -
+            a.time
+    );
+
+    panel.innerHTML = `
+
+        <div style="
+            padding:5px 7px;
+            border-bottom:1px solid #222;
+            color:#777;
+        ">
+            RADIO TRAFFIC
+        </div>
+
+        ${
+            messages
+                .slice(0, 10)
+                .map(
+                    message => `
+
+                        <div style="
+                            padding:2px 7px;
+                            white-space:nowrap;
+                            overflow:hidden;
+                            text-overflow:ellipsis;
+                        ">
+
+                            <span style="
+                                color:#555;
+                            ">
+                                ${message.train}
+                            </span>
+
+                            &nbsp;
+
+                            <span style="
+                                color:#888;
+                            ">
+                                ${message.speaker}:
+                            </span>
+
+                            ${message.text}
+
+                        </div>
+                    `
+                )
+                .join("")
+        }
+    `;
+}
+
+
+/* ============================================================
+   7.33 RADIO HISTORY TIMER
+   ============================================================ */
+
+setInterval(
+    updateRadioHistoryPanel,
+    500
+);
+
+
+/* ============================================================
+   7.34 INITIALIZE RADIO
+   ============================================================ */
+
+function initializeRadioSystem() {
+
+    createRadioHistoryPanel();
+
+    /*
+       Assign voices to trains already present.
+    */
+
+    if (
+        typeof CP !== "undefined" &&
+        Array.isArray(
+            CP.trains
+        )
+    ) {
+
+        CP.trains.forEach(
+            initializeTrainRadio
+        );
+
+        /*
+           Emergency testing control.
+        */
+
+        if (
+            CP.trains.length
+        ) {
+
+            createEmergencyDispatcherControl(
+                CP.trains[0]
+            );
+        }
+    }
+
+    dispatcherEvent(
+        "RADIO DISPATCH SYSTEM ONLINE"
+    );
+
+    dispatcherEvent(
+        "CREW-INITIATED RADIO TRAFFIC ENABLED"
+    );
+}
+
+
+/* ============================================================
+   7.35 INITIALIZATION
+   ============================================================ */
+
+if (
+    document.readyState ===
+    "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeRadioSystem,
+        {
+            once: true
+        }
+    );
+
+} else {
+
+    initializeRadioSystem();
+}
+
+
+/* ============================================================
+   7.36 PUBLIC RADIO API
+   ============================================================ */
+
+window.CONTROL_POINT_RADIO = {
+
+    call:
+        trainCallDispatcher,
+
+    answer:
+        answerInitialTrainCall,
+
+    ready:
+        crewReadyToDepart,
+
+    signal:
+        dispatcherGiveSignal,
+
+    waitOne:
+        dispatcherHoldForOne,
+
+    waitTwo:
+        dispatcherHoldForTwo,
+
+    waitThree:
+        dispatcherHoldForThree,
+
+    hold:
+        dispatcherHoldTrain,
+
+    emergency:
+        trainEmergencyCall,
+
+    voice:
+        assignCrewVoice,
+
+    dispatcher:
+        getTrainDispatcher
+};
+
+
+/* ============================================================
+   7.37 CONSOLE
+   ============================================================ */
+
+console.log(
+    "%cCONTROL POINT — PART 7 ONLINE",
+    "font-weight:bold;font-size:14px;"
+);
+
+console.log(
+    "Crew initiated radio: ONLINE"
+);
+
+console.log(
+    "Dispatcher answer controls: ONLINE"
+);
+
+console.log(
+    "Wait-for-train system: ONLINE"
+);
+
+console.log(
+    "Signal indication conversation: ONLINE"
+);
+
+console.log(
+    "Crew voice assignment: ONLINE"
+);
+
+console.log(
+    "Emergency radio: ONLINE"
+);
+
+
+/* ============================================================
+   END PART 7
+   ============================================================ */
+/* ============================================================
+   CONTROL POINT
+   PART 8 — TRAFFIC + YARD OPERATIONS
+   ============================================================ */
+
+/*
+   This system creates operational traffic around the
+   dispatcher.
+
+   IMPORTANT:
+
+   The traffic generator does NOT teleport trains through
+   occupied territory.
+
+   A generated train is an operating-plan object.
+
+   It must still obey:
+
+       ROUTE
+       ↓
+       SIGNAL
+       ↓
+       BLOCK
+       ↓
+       TRAIN PHYSICS
+       ↓
+       OCCUPANCY
+*/
+
+
+/* ============================================================
+   8.1 TRAFFIC SYSTEM
+   ============================================================ */
+
+CP.traffic = CP.traffic || {};
+
+Object.assign(CP.traffic, {
+
+    enabled: true,
+
+    trainsGenerated: 0,
+
+    lastGeneration: 0,
+
+    minimumSpawnGap: 45000,
+
+    maximumActiveTrains: 12,
+
+    pendingDepartures: [],
+
+    pendingArrivals: [],
+
+    yardTrains: [],
+
+    priorities: {
+
+        EMERGENCY: 100,
+
+        HOTSHOT: 90,
+
+        INTERMODAL: 85,
+
+        PASSENGER: 80,
+
+        MANIFEST: 60,
+
+        LOCAL: 40,
+
+        YARD: 20
+    }
+});
+
+
+/* ============================================================
+   8.2 OPERATING PRIORITIES
+   ============================================================ */
+
+const TRAIN_PRIORITY = {
+
+    EMERGENCY: 100,
+
+    HOTSHOT: 90,
+
+    INTERMODAL: 85,
+
+    PASSENGER: 80,
+
+    MANIFEST: 60,
+
+    LOCAL: 40,
+
+    YARD: 20
+};
+
+
+function getTrainPriority(train) {
+
+    if (!train) {
+        return 0;
+    }
+
+    const type =
+        String(
+            train.type ||
+            train.trainType ||
+            "MANIFEST"
+        ).toUpperCase();
+
+    return (
+        TRAIN_PRIORITY[type] ||
+        50
+    );
+}
+
+
+/* ============================================================
+   8.3 TRAIN OPERATING PLAN
+   ============================================================ */
+
+const OPERATING_PLANS = [
+
+    {
+        symbol: "35J",
+
+        origin: "Chicago",
+
+        destination: "Elkhart",
+
+        direction: "EAST",
+
+        type: "INTERMODAL",
+
+        priority: "HOTSHOT"
+    },
+
+    {
+        symbol: "34G",
+
+        origin: "Elkhart",
+
+        destination: "Chicago",
+
+        direction: "WEST",
+
+        type: "INTERMODAL",
+
+        priority: "INTERMODAL"
+    },
+
+    {
+        symbol: "33G",
+
+        origin: "Elkhart",
+
+        destination: "Chicago",
+
+        direction: "WEST",
+
+        type: "INTERMODAL",
+
+        priority: "HOTSHOT"
+    },
+
+    {
+        symbol: "39E",
+
+        origin: "Elkhart",
+
+        destination: "Chicago",
+
+        direction: "WEST",
+
+        type: "INTERMODAL",
+
+        priority: "INTERMODAL"
+    },
+
+    {
+        symbol: "31M",
+
+        origin: "Elkhart",
+
+        destination: "Chicago",
+
+        direction: "WEST",
+
+        type: "MANIFEST",
+
+        priority: "MANIFEST"
+    },
+
+    {
+        symbol: "302",
+
+        origin: "Elkhart",
+
+        destination: "Bellevue",
+
+        direction: "EAST",
+
+        type: "MANIFEST",
+
+        priority: "MANIFEST"
+    },
+
+    {
+        symbol: "303",
+
+        origin: "Bellevue",
+
+        destination: "Elkhart",
+
+        direction: "WEST",
+
+        type: "MANIFEST",
+
+        priority: "MANIFEST"
+    }
+];
+
+
+/* ============================================================
+   8.4 TRAIN LENGTH PROFILES
+   ============================================================ */
+
+const TRAIN_LENGTH_PROFILES = {
+
+    INTERMODAL: {
+
+        minimum: 6500,
+
+        maximum: 10500
+    },
+
+    MANIFEST: {
+
+        minimum: 5000,
+
+        maximum: 9500
+    },
+
+    HOTSHOT: {
+
+        minimum: 7000,
+
+        maximum: 11000
+    },
+
+    LOCAL: {
+
+        minimum: 1500,
+
+        maximum: 4500
+    }
+};
+
+
+function randomTrainLength(type) {
+
+    const profile =
+        TRAIN_LENGTH_PROFILES[
+            type
+        ] ||
+        TRAIN_LENGTH_PROFILES.MANIFEST;
+
+    return Math.round(
+        profile.minimum +
+        Math.random() *
+        (
+            profile.maximum -
+            profile.minimum
+        )
+    );
+}
+
+
+/* ============================================================
+   8.5 RANDOM CONSIST PROFILE
+   ============================================================ */
+
+function createConsistProfile(type) {
+
+    const profiles = {
+
+        INTERMODAL: {
+
+            locomotives:
+                2 + Math.floor(
+                    Math.random() * 3
+                ),
+
+            cars:
+                90 + Math.floor(
+                    Math.random() * 60
+                )
+        },
+
+        MANIFEST: {
+
+            locomotives:
+                2 + Math.floor(
+                    Math.random() * 2
+                ),
+
+            cars:
+                60 + Math.floor(
+                    Math.random() * 80
+                )
+        },
+
+        LOCAL: {
+
+            locomotives:
+                1,
+
+            cars:
+                15 + Math.floor(
+                    Math.random() * 30
+                )
+        }
+    };
+
+    return (
+        profiles[type] ||
+        profiles.MANIFEST
+    );
+}
+
+
+/* ============================================================
+   8.6 SPAWN LOCATION
+   ============================================================ */
+
+const TRAFFIC_ENTRY_POINTS = {
+
+    CHICAGO: {
+
+        mp: 507,
+
+        track: "main1",
+
+        direction: "EAST"
+    },
+
+    ELKHART_WEST: {
+
+        mp: 423,
+
+        track: "main1",
+
+        direction: "EAST"
+    },
+
+    ELKHART_EAST: {
+
+        mp: 421.5,
+
+        track: "main1",
+
+        direction: "EAST"
+    }
+};
+
+
+/* ============================================================
+   8.7 FIND SPAWN LOCATION
+   ============================================================ */
+
+function getPlanSpawnPoint(plan) {
+
+    if (!plan) {
+        return null;
+    }
+
+    const origin =
+        String(
+            plan.origin ||
+            ""
+        ).toUpperCase();
+
+    if (
+        origin.includes(
+            "CHICAGO"
+        )
+    ) {
+
+        return {
+            ...TRAFFIC_ENTRY_POINTS.CHICAGO
+        };
+    }
+
+    if (
+        origin.includes(
+            "ELKHART"
+        )
+    ) {
+
+        return {
+            ...TRAFFIC_ENTRY_POINTS.ELKHART_WEST
+        };
+    }
+
+    if (
+        origin.includes(
+            "BELLEVUE"
+        )
+    ) {
+
+        return {
+            mp: 402,
+
+            track: "main1",
+
+            direction: "WEST"
+        };
+    }
+
+    return null;
+}
+
+
+/* ============================================================
+   8.8 CREATE TRAFFIC TRAIN
+   ============================================================ */
+
+function createTrafficTrain(plan) {
+
+    if (!plan) {
+        return null;
+    }
+
+    /*
+       Respect active train limit.
+    */
+
+    if (
+        typeof CP.trains !== "undefined" &&
+        Array.isArray(CP.trains) &&
+        CP.trains.length >=
+        CP.traffic.maximumActiveTrains
+    ) {
+
+        return null;
+    }
+
+    const spawn =
+        getPlanSpawnPoint(
+            plan
+        );
+
+    if (!spawn) {
+        return null;
+    }
+
+    const type =
+        plan.type ||
+        "MANIFEST";
+
+    const length =
+        randomTrainLength(
+            type
+        );
+
+    const consist =
+        createConsistProfile(
+            type
+        );
+
+    /*
+       Avoid creating duplicate active symbols.
+    */
+
+    const duplicate =
+        CP.trains.some(
+            train =>
+                (
+                    train.id ||
+                    train.symbol
+                ) ===
+                plan.symbol
+        );
+
+    if (duplicate) {
+        return null;
+    }
+
+    /*
+       Use existing createTrain if available.
+    */
+
+    let train = null;
+
+    try {
+
+        if (
+            typeof createTrain ===
+            "function"
+        ) {
+
+            train =
+                createTrain({
+
+                    id:
+                        plan.symbol,
+
+                    symbol:
+                        plan.symbol,
+
+                    mp:
+                        spawn.mp,
+
+                    track:
+                        spawn.track,
+
+                    direction:
+                        plan.direction,
+
+                    type:
+                        type,
+
+                    trainType:
+                        type,
+
+                    length:
+                        length,
+
+                    speed:
+                        0,
+
+                    origin:
+                        plan.origin,
+
+                    destination:
+                        plan.destination,
+
+                    priority:
+                        plan.priority,
+
+                    dispatcherTerritory:
+                        getDispatcherTerritoryForPlan(
+                            plan
+                        ),
+
+                    locomotives:
+                        consist.locomotives,
+
+                    cars:
+                        consist.cars,
+
+                    hasDeparted:
+                        false
+                });
+        }
+
+    } catch (error) {
+
+        console.warn(
+            "Traffic train creation failed:",
+            error
+        );
+    }
+
+    /*
+       If Part 4's createTrain does not accept an object,
+       create a compatible fallback.
+    */
+
+    if (!train) {
+
+        train = {
+
+            id:
+                plan.symbol,
+
+            symbol:
+                plan.symbol,
+
+            mp:
+                spawn.mp,
+
+            track:
+                spawn.track,
+
+            direction:
+                plan.direction,
+
+            type:
+                type,
+
+            trainType:
+                type,
+
+            length:
+                length,
+
+            speed:
+                0,
+
+            origin:
+                plan.origin,
+
+            destination:
+                plan.destination,
+
+            priority:
+                plan.priority,
+
+            hasDeparted:
+                false,
+
+            locomotives:
+                consist.locomotives,
+
+            cars:
+                consist.cars
+        };
+
+        CP.trains.push(
+            train
+        );
+    }
+
+    /*
+       Traffic metadata.
+    */
+
+    train.operatingPlan =
+        plan;
+
+    train.trafficGenerated =
+        true;
+
+    train.trafficCreatedAt =
+        Date.now();
+
+    train.priorityValue =
+        getTrainPriority(
+            train
+        );
+
+    initializeTrainRadio(
+        train
+    );
+
+    CP.traffic.trainsGenerated++;
+
+    dispatcherEvent(
+        `${plan.symbol} entered operating queue — ${plan.origin} → ${plan.destination}`
+    );
+
+    return train;
+}
+
+
+/* ============================================================
+   8.9 PLAN DISPATCHER TERRITORY
+   ============================================================ */
+
+function getDispatcherTerritoryForPlan(
+    plan
+) {
+
+    if (!plan) {
+        return "CHICAGO";
+    }
+
+    const origin =
+        String(
+            plan.origin ||
+            ""
+        ).toUpperCase();
+
+    if (
+        origin.includes(
+            "ELKHART"
+        )
+    ) {
+
+        return "ELKHART";
+    }
+
+    return "CHICAGO";
+}
+
+
+/* ============================================================
+   8.10 YARD QUEUE
+   ============================================================ */
+
+function addTrainToYardQueue(
+    train,
+    yardName
+) {
+
+    if (!train) {
+        return;
+    }
+
+    const queueEntry = {
+
+        trainId:
+            getTrainRadioID(
+                train
+            ),
+
+        yard:
+            yardName,
+
+        added:
+            Date.now(),
+
+        ready:
+            false
+    };
+
+    CP.traffic.yardTrains.push(
+        queueEntry
+    );
+
+    train.yard =
+        yardName;
+
+    train.yardQueueEntry =
+        queueEntry;
+}
+
+
+/* ============================================================
+   8.11 YARD READY STATUS
+   ============================================================ */
+
+function markTrainYardReady(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+    if (
+        train.yardQueueEntry
+    ) {
+
+        train.yardQueueEntry.ready =
+            true;
+    }
+
+    train.yardReady =
+        true;
+
+    dispatcherEvent(
+        `${getTrainRadioID(train)} is ready in ${train.yard || "yard"}`
+    );
+}
+
+
+/* ============================================================
+   8.12 TRAIN QUEUE DISPLAY
+   ============================================================ */
+
+function renderTrafficQueue() {
+
+    let panel =
+        document.getElementById(
+            "cp-traffic-queue"
+        );
+
+    if (!panel) {
+
+        panel =
+            document.createElement(
+                "div"
+            );
+
+        panel.id =
+            "cp-traffic-queue";
+
+        panel.style.position =
+            "fixed";
+
+        panel.style.top =
+            "70px";
+
+        panel.style.right =
+            "10px";
+
+        panel.style.width =
+            "250px";
+
+        panel.style.maxHeight =
+            "180px";
+
+        panel.style.overflow =
+            "hidden";
+
+        panel.style.background =
+            "rgba(0,0,0,.90)";
+
+        panel.style.border =
+            "1px solid #222";
+
+        panel.style.color =
+            "#aaa";
+
+        panel.style.font =
+            "9px monospace";
+
+        panel.style.zIndex =
+            "7000";
+
+        panel.style.pointerEvents =
+            "none";
+
+        document.body.appendChild(
+            panel
+        );
+    }
+
+    const trains =
+        Array.isArray(CP.trains)
+            ? CP.trains
+            : [];
+
+    const sorted =
+        [...trains]
+            .sort(
+                (
+                    a,
+                    b
+                ) =>
+                    getTrainPriority(b) -
+                    getTrainPriority(a)
+            );
+
+    panel.innerHTML = `
+
+        <div style="
+            padding:5px 7px;
+            border-bottom:1px solid #222;
+            color:#777;
+        ">
+            ACTIVE TRAFFIC
+        </div>
+
+        ${
+            sorted
+                .slice(0, 10)
+                .map(
+                    train => {
+
+                        const id =
+                            getTrainRadioID(
+                                train
+                            );
+
+                        const speed =
+                            Math.round(
+                                Number(
+                                    train.speed ||
+                                    0
+                                )
+                            );
+
+                        const state =
+                            train.radioState
+                                ? train.radioState.state
+                                : "UNKNOWN";
+
+                        return `
+
+                            <div style="
+                                padding:3px 7px;
+                                border-bottom:1px solid #111;
+                            ">
+
+                                <span style="
+                                    color:#fff;
+                                ">
+                                    ${id}
+                                </span>
+
+                                &nbsp;
+
+                                <span>
+                                    ${speed} MPH
+                                </span>
+
+                                <br>
+
+                                <span style="
+                                    color:#555;
+                                ">
+                                    ${state}
+                                </span>
+
+                            </div>
+                        `;
+                    }
+                )
+                .join("")
+        }
+    `;
+}
+
+
+/* ============================================================
+   8.13 TRAFFIC CONFLICT DETECTION
+   ============================================================ */
+
+function trainsAreOnCollisionCourse(
+    trainA,
+    trainB
+) {
+
+    if (
+        !trainA ||
+        !trainB
+    ) {
+
+        return false;
+    }
+
+    if (
+        trainA ===
+        trainB
+    ) {
+
+        return false;
+    }
+
+    const aMP =
+        Number(
+            trainA.mp
+        );
+
+    const bMP =
+        Number(
+            trainB.mp
+        );
+
+    if (
+        !Number.isFinite(aMP) ||
+        !Number.isFinite(bMP)
+    ) {
+
+        return false;
+    }
+
+    /*
+       Different tracks are not automatically safe.
+
+       Final route topology will determine actual conflicts.
+
+       For now this is a conservative warning zone.
+    */
+
+    const separation =
+        Math.abs(
+            aMP -
+            bMP
+        );
+
+    if (
+        separation >
+        2
+    ) {
+
+        return false;
+    }
+
+    const aDirection =
+        String(
+            trainA.direction ||
+            ""
+        ).toUpperCase();
+
+    const bDirection =
+        String(
+            trainB.direction ||
+            ""
+        ).toUpperCase();
+
+    /*
+       Opposing trains on nearby territory.
+    */
+
+    if (
+        (
+            aDirection.includes(
+                "EAST"
+            ) &&
+            bDirection.includes(
+                "WEST"
+            )
+        ) ||
+        (
+            aDirection.includes(
+                "WEST"
+            ) &&
+            bDirection.includes(
+                "EAST"
+            )
+        )
+    ) {
+
+        return true;
+    }
+
+    /*
+       Same direction with insufficient separation.
+    */
+
+    const aSpeed =
+        Number(
+            trainA.speed ||
+            0
+        );
+
+    const bSpeed =
+        Number(
+            trainB.speed ||
+            0
+        );
+
+    if (
+        aDirection ===
+        bDirection &&
+        Math.abs(
+            aSpeed -
+            bSpeed
+        ) > 10
+    ) {
+
+        return true;
+    }
+
+    return false;
+}
+
+
+/* ============================================================
+   8.14 COLLISION WARNING
+   ============================================================ */
+
+function checkTrafficConflicts() {
+
+    if (
+        !Array.isArray(
+            CP.trains
+        )
+    ) {
+
+        return;
+    }
+
+    for (
+        let i = 0;
+        i < CP.trains.length;
+        i++
+    ) {
+
+        for (
+            let j = i + 1;
+            j < CP.trains.length;
+            j++
+        ) {
+
+            const a =
+                CP.trains[i];
+
+            const b =
+                CP.trains[j];
+
+            if (
+                trainsAreOnCollisionCourse(
+                    a,
+                    b
+                )
+            ) {
+
+                issueDispatcherWarning(
+                    a,
+                    b
+                );
+            }
+        }
+    }
+}
+
+
+/* ============================================================
+   8.15 DISPATCHER WARNING
+   ============================================================ */
+
+const CP_WARNING_COOLDOWN =
+    {};
+
+function issueDispatcherWarning(
+    trainA,
+    trainB
+) {
+
+    const a =
+        getTrainRadioID(
+            trainA
+        );
+
+    const b =
+        getTrainRadioID(
+            trainB
+        );
+
+    const key =
+        [a, b]
+            .sort()
+            .join("|");
+
+    const now =
+        Date.now();
+
+    if (
+        CP_WARNING_COOLDOWN[key] &&
+        now -
+        CP_WARNING_COOLDOWN[key] <
+        10000
+    ) {
+
+        return;
+    }
+
+    CP_WARNING_COOLDOWN[key] =
+        now;
+
+    dispatcherEvent(
+        `WARNING — ${a} / ${b} CLOSE PROXIMITY`,
+        "warning"
+    );
+}
+
+
+/* ============================================================
+   8.16 TRAFFIC GENERATION
+   ============================================================ */
+
+function generateTrafficTrain() {
+
+    if (
+        !CP.traffic.enabled
+    ) {
+
+        return null;
+    }
+
+    if (
+        !Array.isArray(
+            CP.trains
+        )
+    ) {
+
+        return null;
+    }
+
+    if (
+        CP.trains.length >=
+        CP.traffic.maximumActiveTrains
+    ) {
+
+        return null;
+    }
+
+    const now =
+        Date.now();
+
+    if (
+        now -
+        CP.traffic.lastGeneration <
+        CP.traffic.minimumSpawnGap
+    ) {
+
+        return null;
+    }
+
+    CP.traffic.lastGeneration =
+        now;
+
+    /*
+       Choose a plan.
+
+       Hotshot/intermodal traffic receives a greater chance
+       during busy traffic periods.
+    */
+
+    const plan =
+        OPERATING_PLANS[
+            Math.floor(
+                Math.random() *
+                OPERATING_PLANS.length
+            )
+        ];
+
+    return createTrafficTrain(
+        plan
+    );
+}
+
+
+/* ============================================================
+   8.17 INITIAL TRAFFIC
+   ============================================================ */
+
+function initializeTrafficScenario() {
+
+    /*
+       We want enough traffic to test the railroad without
+       instantly filling the board.
+
+       Existing 33G from Part 4 is preserved.
+    */
+
+    if (
+        typeof CP.trains ===
+        "undefined"
+    ) {
+
+        CP.trains = [];
+    }
+
+    /*
+       Add 35J if it isn't already present.
+    */
+
+    if (
+        !CP.trains.some(
+            train =>
+                getTrainRadioID(
+                    train
+                ) ===
+                "35J"
+        )
+    ) {
+
+        const train =
+            createTrafficTrain(
+                OPERATING_PLANS[0]
+            );
+
+        if (train) {
+
+            train.hasDeparted =
+                false;
+
+            addTrainToYardQueue(
+                train,
+                "Chicago"
+            );
+
+            markTrainYardReady(
+                train
+            );
+        }
+    }
+
+    /*
+       Add a second train approaching the opposite end of
+       the same operating area.
+
+       This gives the dispatcher something to manage.
+    */
+
+    if (
+        !CP.trains.some(
+            train =>
+                getTrainRadioID(
+                    train
+                ) ===
+                "34G"
+        )
+    ) {
+
+        const train =
+            createTrafficTrain(
+                OPERATING_PLANS[1]
+            );
+
+        if (train) {
+
+            train.mp =
+                421.5;
+
+            train.track =
+                "main2";
+
+            train.speed =
+                0;
+
+            train.hasDeparted =
+                false;
+
+            addTrainToYardQueue(
+                train,
+                "Elkhart"
+            );
+
+            markTrainYardReady(
+                train
+            );
+        }
+    }
+
+    dispatcherEvent(
+        "INITIAL OPERATING TRAFFIC LOADED"
+    );
+}
+
+
+/* ============================================================
+   8.18 AUTOMATIC TRAFFIC TIMER
+   ============================================================ */
+
+function updateTrafficGenerator() {
+
+    /*
+       Only generate automatically after the initial traffic
+       has settled.
+
+       This keeps the first test understandable.
+    */
+
+    if (
+        !CP.traffic.enabled
+    ) {
+
+        return;
+    }
+
+    const now =
+        Date.now();
+
+    /*
+       45 seconds minimum between generated trains.
+    */
+
+    if (
+        now -
+        CP.traffic.lastGeneration <
+        CP.traffic.minimumSpawnGap
+    ) {
+
+        return;
+    }
+
+    /*
+       Don't constantly flood the dispatcher.
+    */
+
+    if (
+        CP.trains.length >=
+        CP.traffic.maximumActiveTrains
+    ) {
+
+        return;
+    }
+
+    /*
+       Moderate generation probability.
+    */
+
+    if (
+        Math.random() <
+        0.20
+    ) {
+
+        generateTrafficTrain();
+    }
+}
+
+
+/* ============================================================
+   8.19 TRAFFIC UPDATE HOOK
+   ============================================================ */
+
+function updateTrafficSystem() {
+
+    if (
+        !Array.isArray(
+            CP.trains
+        )
+    ) {
+
+        return;
+    }
+
+    CP.trains.forEach(
+        train => {
+
+            initializeTrainRadio(
+                train
+            );
+        }
+    );
+
+    checkTrafficConflicts();
+
+    updateTrafficGenerator();
+
+    renderTrafficQueue();
+}
+
+
+/* ============================================================
+   8.20 INSTALL TRAFFIC HOOK
+   ============================================================ */
+
+(function installTrafficHook() {
+
+    if (
+        window.__cpTrafficHookInstalled
+    ) {
+
+        return;
+    }
+
+    const previous =
+        window.updateDispatcherControlLayer;
+
+    if (
+        typeof previous ===
+        "function"
+    ) {
+
+        window.updateDispatcherControlLayer =
+            function(...args) {
+
+                previous.apply(
+                    this,
+                    args
+                );
+
+                updateTrafficSystem();
+            };
+
+        window.__cpTrafficHookInstalled =
+            true;
+    }
+
+})();
+
+
+/* ============================================================
+   8.21 MANUAL TRAFFIC GENERATOR
+   ============================================================ */
+
+function createTrafficTestButton() {
+
+    if (
+        document.getElementById(
+            "cp-create-traffic"
+        )
+    ) {
+
+        return;
+    }
+
+    const button =
+        document.createElement(
+            "button"
+        );
+
+    button.id =
+        "cp-create-traffic";
+
+    button.textContent =
+        "NEW TRAIN";
+
+    button.style.position =
+        "fixed";
+
+    button.style.right =
+        "10px";
+
+    button.style.bottom =
+        "215px";
+
+    button.style.zIndex =
+        "10000";
+
+    button.style.background =
+        "#111";
+
+    button.style.border =
+        "1px solid #555";
+
+    button.style.color =
+        "#bbb";
+
+    button.style.fontFamily =
+        "monospace";
+
+    button.style.fontSize =
+        "9px";
+
+    button.style.padding =
+        "5px 7px";
+
+    button.addEventListener(
+        "click",
+        () => {
+
+            const train =
+                generateTrafficTrain();
+
+            if (!train) {
+
+                dispatcherEvent(
+                    "NO TRAIN GENERATED — TRAFFIC LIMIT OR COOLDOWN"
+                );
+
+            }
+        }
+    );
+
+    document.body.appendChild(
+        button
+    );
+}
+
+
+/* ============================================================
+   8.22 INITIALIZE TRAFFIC
+   ============================================================ */
+
+function initializeTrafficSystem() {
+
+    initializeTrafficScenario();
+
+    createTrafficTestButton();
+
+    renderTrafficQueue();
+
+    dispatcherEvent(
+        "TRAFFIC MANAGEMENT SYSTEM ONLINE"
+    );
+
+    dispatcherEvent(
+        "YARD / MAINLINE TRAFFIC QUEUE ACTIVE"
+    );
+}
+
+
+/* ============================================================
+   8.23 START TRAFFIC SYSTEM
+   ============================================================ */
+
+if (
+    document.readyState ===
+    "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeTrafficSystem,
+        {
+            once: true
+        }
+    );
+
+} else {
+
+    initializeTrafficSystem();
+}
+
+
+/* ============================================================
+   8.24 PUBLIC TRAFFIC API
+   ============================================================ */
+
+window.CONTROL_POINT_TRAFFIC = {
+
+    generate:
+        generateTrafficTrain,
+
+    create:
+        createTrafficTrain,
+
+    plans:
+        OPERATING_PLANS,
+
+    priority:
+        getTrainPriority,
+
+    conflict:
+        trainsAreOnCollisionCourse,
+
+    yardQueue:
+        CP.traffic.yardTrains
+};
+
+
+/* ============================================================
+   8.25 CONSOLE
+   ============================================================ */
+
+console.log(
+    "%cCONTROL POINT — PART 8 ONLINE",
+    "font-weight:bold;font-size:14px;"
+);
+
+console.log(
+    "Operating traffic: ONLINE"
+);
+
+console.log(
+    "Train priority system: ONLINE"
+);
+
+console.log(
+    "Yard queue system: ONLINE"
+);
+
+console.log(
+    "Traffic conflict detection: ONLINE"
+);
+
+console.log(
+    "Automatic train generation: ONLINE"
+);
+
+
+/* ============================================================
+   END PART 8
+   ============================================================ */
+
 </script>
 
 </body>
