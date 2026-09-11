@@ -1,0 +1,7717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CONTROL POINT</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: #050505;
+        color: #e8e8e8;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+        overflow: hidden;
+    }
+
+    #app {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* =========================
+       DISPATCHER HEADER
+       ========================= */
+
+    #header {
+        height: 54px;
+        background: #0b0b0b;
+        border-bottom: 1px solid #303030;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 14px;
+        flex-shrink: 0;
+    }
+
+    #title {
+        font-weight: bold;
+        letter-spacing: 2px;
+        color: #f0f0f0;
+    }
+
+    #territoryStatus {
+        font-size: 12px;
+        color: #aaa;
+    }
+
+    /* =========================
+       MAIN DISPATCH AREA
+       ========================= */
+
+    #main {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+        overflow: auto;
+        background: #080808;
+    }
+
+    #territory {
+        position: relative;
+        min-width: 1600px;
+        min-height: 900px;
+        padding: 100px 80px;
+    }
+
+    /* =========================
+       TRACK LAYER
+       ========================= */
+
+    .track {
+        position: absolute;
+        height: 4px;
+        background: #bdbdbd;
+        left: 80px;
+        right: 80px;
+    }
+
+    .track-label {
+        position: absolute;
+        left: 25px;
+        font-size: 11px;
+        color: #777;
+    }
+
+    /* =========================
+       CONTROL POINT LAYER
+       ========================= */
+
+    .cp {
+        position: absolute;
+        top: 50px;
+        transform: translateX(-50%);
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .cp-name {
+        font-weight: bold;
+        color: #ddd;
+        font-size: 13px;
+    }
+
+    .cp-milepost {
+        font-size: 11px;
+        color: #777;
+        margin-top: 3px;
+    }
+
+    .cp-line {
+        width: 2px;
+        height: 70px;
+        background: #555;
+        margin: 7px auto 0;
+    }
+
+    /* =========================
+       SIGNAL LAYER
+       ========================= */
+
+    .signal {
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        border: 1px solid #aaa;
+        background: #222;
+    }
+
+    .signal.stop {
+        background: #c40000;
+    }
+
+    .signal.clear {
+        background: #00a83b;
+    }
+
+    .signal.approach {
+        background: #d59b00;
+    }
+
+    /* =========================
+       INFORMATION PANEL
+       ========================= */
+
+    #info {
+        position: absolute;
+        right: 15px;
+        top: 15px;
+        width: 270px;
+        background: rgba(8,8,8,.96);
+        border: 1px solid #333;
+        padding: 12px;
+        font-size: 12px;
+    }
+
+    #info h3 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        letter-spacing: 1px;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 0;
+        border-bottom: 1px solid #181818;
+    }
+
+    .info-label {
+        color: #777;
+    }
+
+    /* =========================
+       BOTTOM STATUS BAR
+       ========================= */
+
+    #status {
+        height: 32px;
+        background: #0b0b0b;
+        border-top: 1px solid #303030;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
+        gap: 25px;
+        font-size: 11px;
+        color: #888;
+        flex-shrink: 0;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="app">
+
+    <header id="header">
+        <div id="title">CONTROL POINT</div>
+        <div id="territoryStatus">
+            CHICAGO LINE • ELKHART / PORTER TERRITORY
+        </div>
+    </header>
+
+    <main id="main">
+
+        <div id="territory">
+
+            <!-- =========================
+                 PHYSICAL TRACK LAYER
+                 ========================= -->
+
+            <div class="track" style="top:220px;"></div>
+            <div class="track" style="top:270px;"></div>
+
+            <div class="track-label" style="top:208px;">
+                TRACK 1
+            </div>
+
+            <div class="track-label" style="top:258px;">
+                TRACK 2
+            </div>
+
+            <!-- =========================
+                 CONTROL POINTS
+                 ========================= -->
+
+            <div class="cp" style="left:6%;">
+                <div class="cp-name">CP 482</div>
+                <div class="cp-milepost">MP 482.2</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <div class="cp" style="left:22%;">
+                <div class="cp-name">CP 466</div>
+                <div class="cp-milepost">MP 466.6</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <div class="cp" style="left:28%;">
+                <div class="cp-name">CP 462</div>
+                <div class="cp-milepost">MP 462.4</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <div class="cp" style="left:44%;">
+                <div class="cp-name">CP 448</div>
+                <div class="cp-milepost">MP 448.6</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <div class="cp" style="left:70%;">
+                <div class="cp-name">CP 437</div>
+                <div class="cp-milepost">MP 437.5</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <div class="cp" style="left:75%;">
+                <div class="cp-name">CP 435</div>
+                <div class="cp-milepost">MP 435.4</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <div class="cp" style="left:90%;">
+                <div class="cp-name">CP 426</div>
+                <div class="cp-milepost">MP 426.4</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <div class="cp" style="left:95%;">
+                <div class="cp-name">CP 423</div>
+                <div class="cp-milepost">MP 423.1</div>
+                <div class="cp-line"></div>
+            </div>
+
+            <!-- =========================
+                 INFORMATION PANEL
+                 ========================= -->
+
+            <div id="info">
+
+                <h3>TERRITORY STATUS</h3>
+
+                <div class="info-row">
+                    <span class="info-label">Territory</span>
+                    <span>Chicago Line</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">West End</span>
+                    <span>CP 482</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">East End</span>
+                    <span>CP 421</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Control</span>
+                    <span>CTC</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Track</span>
+                    <span>2+ main tracks</span>
+                </div>
+
+                <div class="info-row">
+                    <span class="info-label">Status</span>
+                    <span style="color:#00a83b;">
+                        ONLINE
+                    </span>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer id="status">
+        <span>WEST ◀</span>
+        <span>CHICAGO LINE</span>
+        <span>▶ EAST</span>
+        <span>MP 482.2</span>
+        <span>DISPATCH SYSTEM READY</span>
+    </footer>
+
+</div>
+
+<script>
+
+/*
+============================================================
+CONTROL POINT
+PART 1: CHICAGO LINE TERRITORY DATABASE
+============================================================
+
+This database is intentionally separate from the renderer.
+
+The game will eventually use this same information for:
+
+- track drawing
+- blocks
+- signals
+- switches
+- routes
+- trains
+- dispatching
+- radio calls
+- destinations
+- detector events
+- operating-day evaluation
+============================================================
+*/
+
+const CHICAGO_LINE = {
+
+    territory: {
+        name: "Norfolk Southern Chicago Line",
+        direction: "WEST_TO_EAST",
+        westernControlPoint: "CP 482",
+        easternControlPoint: "CP 421"
+    },
+
+    controlPoints: [
+
+        {
+            id: "CP482",
+            name: "CP 482",
+            milepost: 482.2,
+            junction: true,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP466",
+            name: "CP 466",
+            milepost: 466.6,
+            junction: false,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP462",
+            name: "CP 462",
+            milepost: 462.4,
+            junction: true,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP448",
+            name: "CP 448",
+            milepost: 448.6,
+            junction: false,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP437",
+            name: "CP 437",
+            milepost: 437.5,
+            junction: true,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP435",
+            name: "CP 435",
+            milepost: 435.4,
+            junction: false,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP426",
+            name: "CP 426",
+            milepost: 426.4,
+            junction: false,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP423",
+            name: "CP 423",
+            milepost: 423.1,
+            junction: false,
+            tracks: ["1", "2"]
+        },
+
+        {
+            id: "CP421",
+            name: "CP 421",
+            milepost: 421.5,
+            junction: true,
+            tracks: ["1", "2"]
+        }
+
+    ],
+
+    locations: [
+
+        {
+            name: "Porter",
+            milepost: 482.2,
+            type: "junction"
+        },
+
+        {
+            name: "Chesterton",
+            milepost: 481.1,
+            type: "location"
+        },
+
+        {
+            name: "Burdick",
+            milepost: 476.8,
+            type: "location"
+        },
+
+        {
+            name: "Otis",
+            milepost: 473.4,
+            type: "location"
+        },
+
+        {
+            name: "Pinola",
+            milepost: 467.5,
+            type: "location"
+        },
+
+        {
+            name: "La Porte",
+            milepost: 463.4,
+            type: "location"
+        },
+
+        {
+            name: "Rolling Prairie",
+            milepost: 456.4,
+            type: "location"
+        },
+
+        {
+            name: "New Carlisle",
+            milepost: 450.1,
+            type: "location"
+        },
+
+        {
+            name: "Terre Coupee",
+            milepost: 448.4,
+            type: "location"
+        },
+
+        {
+            name: "Lydick",
+            milepost: 443.7,
+            type: "location"
+        },
+
+        {
+            name: "South Bend",
+            milepost: 438.5,
+            type: "location"
+        },
+
+        {
+            name: "Mishawaka",
+            milepost: 432.7,
+            type: "location"
+        },
+
+        {
+            name: "Elkhart",
+            milepost: 421.6,
+            type: "terminal"
+        }
+
+    ]
+
+};
+
+
+/*
+============================================================
+BASIC TERRITORY HELPERS
+============================================================
+*/
+
+function getControlPoint(id) {
+    return CHICAGO_LINE.controlPoints.find(cp => cp.id === id);
+}
+
+function getLocation(name) {
+    return CHICAGO_LINE.locations.find(
+        location => location.name === name
+    );
+}
+
+function getMilepost(id) {
+    const cp = getControlPoint(id);
+    return cp ? cp.milepost : null;
+}
+
+
+/*
+============================================================
+INITIAL TEST
+============================================================
+*/
+
+console.log(
+    "CONTROL POINT territory loaded:",
+    CHICAGO_LINE.territory.name
+);
+
+console.log(
+    "Control points:",
+    CHICAGO_LINE.controlPoints.length
+);
+
+console.log(
+    "CP 437:",
+    getControlPoint("CP437")
+);
+<script>
+
+/*
+============================================================
+CONTROL POINT
+PART 2
+CHICAGO LINE TRACK / NETWORK MODEL
+============================================================
+
+The railroad is modeled as connected track segments.
+
+The display is only a visual representation of this model.
+
+Every segment can eventually have:
+
+- occupancy
+- direction
+- signals
+- switches
+- speed
+- route locking
+- trains
+- maintenance status
+============================================================
+*/
+
+const TRACK_NETWORK = {
+
+    /*
+    --------------------------------------------------------
+    TERRITORY
+    --------------------------------------------------------
+    */
+
+    territory: {
+        railroad: "Norfolk Southern",
+        subdivision: "Chicago Line",
+        westEnd: "CP482",
+        eastEnd: "CP421",
+        direction: "WEST_TO_EAST"
+    },
+
+
+    /*
+    --------------------------------------------------------
+    TRACK DEFINITIONS
+    --------------------------------------------------------
+    */
+
+    tracks: {
+
+        T1: {
+            id: "T1",
+            name: "Track 1",
+            class: "main",
+            direction: "BIDIRECTIONAL",
+            status: "ACTIVE"
+        },
+
+        T2: {
+            id: "T2",
+            name: "Track 2",
+            class: "main",
+            direction: "BIDIRECTIONAL",
+            status: "ACTIVE"
+        }
+
+    },
+
+
+    /*
+    --------------------------------------------------------
+    TRACK SEGMENTS
+    --------------------------------------------------------
+
+    A segment is the smallest useful piece of railroad.
+
+    Later, these will be populated from the verified
+    Chicago Line infrastructure database.
+    --------------------------------------------------------
+    */
+
+    segments: [
+
+        {
+            id: "SEG482_485_T1",
+            track: "T1",
+            from: "CP482",
+            to: "CP485",
+            direction: "WEST_TO_EAST",
+
+            occupancy: "CLEAR",
+
+            signals: [],
+            switches: [],
+            routes: [],
+
+            train: null
+        },
+
+        {
+            id: "SEG482_485_T2",
+            track: "T2",
+            from: "CP482",
+            to: "CP485",
+            direction: "WEST_TO_EAST",
+
+            occupancy: "CLEAR",
+
+            signals: [],
+            switches: [],
+            routes: [],
+
+            train: null
+        }
+
+    ]
+
+};
+
+
+/*
+============================================================
+SWITCH MODEL
+============================================================
+
+A switch is NOT just a visual arrow.
+
+It has an actual state.
+============================================================
+*/
+
+const SWITCHES = {
+
+    SW482A: {
+
+        id: "SW482A",
+
+        controlPoint: "CP482",
+
+        position: "NORMAL",
+
+        commandedPosition: "NORMAL",
+
+        state: "STABLE",
+
+        locked: false,
+
+        occupied: false,
+
+        available: true
+
+    }
+
+};
+
+
+/*
+============================================================
+SIGNAL MODEL
+============================================================
+*/
+
+const SIGNALS = {
+
+    /*
+     * Dispatcher-controlled signal
+     */
+
+    SIG482E1: {
+
+        id: "SIG482E1",
+
+        controlPoint: "CP482",
+
+        direction: "EASTBOUND",
+
+        type: "CONTROLLED",
+
+        indication: "STOP",
+
+        route: null,
+
+        blockAhead: "CLEAR",
+
+        routeLocked: false
+
+    }
+
+};
+
+
+/*
+============================================================
+BLOCK MODEL
+============================================================
+
+Blocks are what allow the dispatcher system to know
+where trains are and what territory is occupied.
+============================================================
+*/
+
+const BLOCKS = {
+
+    B482_485_1: {
+
+        id: "B482_485_1",
+
+        track: "T1",
+
+        from: "CP482",
+
+        to: "CP485",
+
+        occupied: false,
+
+        trainId: null,
+
+        protected: false
+
+    },
+
+
+    B482_485_2: {
+
+        id: "B482_485_2",
+
+        track: "T2",
+
+        from: "CP482",
+
+        to: "CP485",
+
+        occupied: false,
+
+        trainId: null,
+
+        protected: false
+
+    }
+
+};
+
+
+/*
+============================================================
+ROUTE MODEL
+============================================================
+
+The dispatcher requests a route.
+
+The route engine determines whether it can actually
+be established.
+============================================================
+*/
+
+const ROUTES = {
+
+    CP482_EAST_T1: {
+
+        id: "CP482_EAST_T1",
+
+        controlPoint: "CP482",
+
+        direction: "EASTBOUND",
+
+        entrySignal: "SIG482E1",
+
+        destinationTrack: "T1",
+
+        switches: [],
+
+        blocks: [
+            "B482_485_1"
+        ],
+
+        state: "AVAILABLE"
+
+    }
+
+};
+
+
+/*
+============================================================
+DISPLAY LAYERS
+============================================================
+
+The ATCS-style display is layered.
+
+The layers don't change the railroad.
+
+They change what the dispatcher sees.
+============================================================
+*/
+
+const DISPLAY_LAYERS = {
+
+    physicalTrack: true,
+
+    controlPoints: true,
+
+    mileposts: true,
+
+    signals: true,
+
+    switches: true,
+
+    occupancy: true,
+
+    routes: true,
+
+    trains: true,
+
+    detectors: true,
+
+    yards: true,
+
+    junctions: true,
+
+    maintenance: false,
+
+    authorities: false,
+
+    trainLabels: true
+
+};
+
+
+/*
+============================================================
+ROUTE VALIDATION
+============================================================
+*/
+
+function canEstablishRoute(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) {
+        return {
+            allowed: false,
+            reason: "ROUTE DOES NOT EXIST"
+        };
+    }
+
+
+    /*
+     * Check every block.
+     */
+
+    for (const blockId of route.blocks) {
+
+        const block = BLOCKS[blockId];
+
+        if (!block) {
+
+            return {
+                allowed: false,
+                reason: `MISSING BLOCK ${blockId}`
+            };
+
+        }
+
+        if (block.occupied) {
+
+            return {
+                allowed: false,
+                reason: `BLOCK ${blockId} OCCUPIED`
+            };
+
+        }
+
+    }
+
+
+    /*
+     * Check switches.
+     */
+
+    for (const switchId of route.switches) {
+
+        const sw = SWITCHES[switchId];
+
+        if (!sw) {
+
+            return {
+                allowed: false,
+                reason: `MISSING SWITCH ${switchId}`
+            };
+
+        }
+
+        if (sw.occupied) {
+
+            return {
+                allowed: false,
+                reason: `SWITCH ${switchId} OCCUPIED`
+            };
+
+        }
+
+        if (sw.locked) {
+
+            return {
+                allowed: false,
+                reason: `SWITCH ${switchId} LOCKED`
+            };
+
+        }
+
+    }
+
+
+    return {
+        allowed: true,
+        reason: "ROUTE AVAILABLE"
+    };
+
+}
+
+
+/*
+============================================================
+ESTABLISH ROUTE
+============================================================
+*/
+
+function establishRoute(routeId) {
+
+    const check = canEstablishRoute(routeId);
+
+    if (!check.allowed) {
+
+        console.warn(
+            "ROUTE DENIED:",
+            routeId,
+            check.reason
+        );
+
+        return false;
+
+    }
+
+
+    const route = ROUTES[routeId];
+
+    route.state = "LINED";
+
+
+    /*
+     * Lock required switches.
+     */
+
+    for (const switchId of route.switches) {
+
+        const sw = SWITCHES[switchId];
+
+        sw.locked = true;
+        sw.commandedPosition = sw.position;
+
+    }
+
+
+    /*
+     * Protect the route blocks.
+     */
+
+    for (const blockId of route.blocks) {
+
+        BLOCKS[blockId].protected = true;
+
+    }
+
+
+    /*
+     * Update signal.
+     */
+
+    const signal = SIGNALS[route.entrySignal];
+
+    if (signal) {
+
+        signal.route = routeId;
+        signal.routeLocked = true;
+
+        /*
+         * This is intentionally conservative.
+
+         * Later the signal engine will determine the
+         * actual indication from the complete territory
+         * and signal logic.
+         */
+
+        signal.indication = "CLEAR";
+
+    }
+
+
+    return true;
+
+}
+
+
+/*
+============================================================
+RELEASE ROUTE
+============================================================
+*/
+
+function releaseRoute(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return false;
+
+
+    route.state = "AVAILABLE";
+
+
+    for (const blockId of route.blocks) {
+
+        if (BLOCKS[blockId]) {
+            BLOCKS[blockId].protected = false;
+        }
+
+    }
+
+
+    if (SIGNALS[route.entrySignal]) {
+
+        SIGNALS[route.entrySignal].route = null;
+        SIGNALS[route.entrySignal].routeLocked = false;
+        SIGNALS[route.entrySignal].indication = "STOP";
+
+    }
+
+
+    for (const switchId of route.switches) {
+
+        if (SWITCHES[switchId]) {
+
+            SWITCHES[switchId].locked = false;
+
+        }
+
+    }
+
+
+    return true;
+
+}
+
+
+/*
+============================================================
+OCCUPANCY
+============================================================
+*/
+
+function occupyBlock(blockId, trainId) {
+
+    const block = BLOCKS[blockId];
+
+    if (!block) return false;
+
+    block.occupied = true;
+    block.trainId = trainId;
+
+    updateSignalProtection();
+
+}
+
+
+function clearBlock(blockId) {
+
+    const block = BLOCKS[blockId];
+
+    if (!block) return false;
+
+    block.occupied = false;
+    block.trainId = null;
+
+    updateSignalProtection();
+
+}
+
+
+/*
+============================================================
+SIGNAL PROTECTION
+============================================================
+
+This is deliberately separate from the display.
+
+The display reports the result.
+
+The railroad logic determines the result.
+============================================================
+*/
+
+function updateSignalProtection() {
+
+    for (const signalId in SIGNALS) {
+
+        const signal = SIGNALS[signalId];
+
+        /*
+         * If its protected route is occupied,
+         * force the signal toward STOP.
+         */
+
+        if (signal.route) {
+
+            const route = ROUTES[signal.route];
+
+            const occupied = route.blocks.some(
+                blockId => BLOCKS[blockId]?.occupied
+            );
+
+            if (occupied) {
+
+                signal.indication = "STOP";
+
+            }
+
+        }
+
+    }
+
+}
+
+
+/*
+============================================================
+ATCS DISPLAY STATE
+============================================================
+*/
+
+function getDisplayState() {
+
+    return {
+
+        tracks: TRACK_NETWORK.tracks,
+
+        segments: TRACK_NETWORK.segments,
+
+        switches:
+            DISPLAY_LAYERS.switches
+                ? SWITCHES
+                : {},
+
+        signals:
+            DISPLAY_LAYERS.signals
+                ? SIGNALS
+                : {},
+
+        blocks:
+            DISPLAY_LAYERS.occupancy
+                ? BLOCKS
+                : {},
+
+        routes:
+            DISPLAY_LAYERS.routes
+                ? ROUTES
+                : {}
+
+    };
+
+}
+
+
+/*
+============================================================
+TEST
+============================================================
+*/
+
+console.log(
+    "CONTROL POINT Part 2 loaded."
+);
+
+console.log(
+    canEstablishRoute("CP482_EAST_T1")
+);
+
+<script>
+
+/*
+============================================================
+CONTROL POINT
+PART 3
+CHICAGO LINE INFRASTRUCTURE DATABASE
+============================================================
+
+This layer describes physical railroad infrastructure.
+
+IMPORTANT:
+The database distinguishes between:
+
+    VERIFIED / SOURCE-BACKED
+    NEEDS_VERIFICATION
+    HISTORICAL
+
+We do NOT invent infrastructure simply to make the map
+look full.
+
+The final 2026 territory database will be completed only
+after each location is verified.
+============================================================
+*/
+
+
+const INFRASTRUCTURE = {
+
+
+    /*
+    ========================================================
+    CONTROL POINTS
+    ========================================================
+    */
+
+    controlPoints: {
+
+        CP482: {
+            id: "CP482",
+            name: "CP 482",
+            milepost: 482.2,
+
+            type: "JUNCTION",
+
+            territory: "CHICAGO_LINE",
+
+            status: "ACTIVE",
+
+            /*
+             * Porter Junction is where the Chicago Line
+             * connects with other railroad movements.
+             */
+
+            junctions: [
+                "NS_CHICAGO_LINE",
+                "AMTRAK_MICHIGAN_LINE",
+                "CSX_CONNECTION"
+            ],
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP466: {
+            id: "CP466",
+            name: "CP 466",
+            milepost: 466.6,
+
+            type: "CONTROL_POINT",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP462: {
+            id: "CP462",
+            name: "CP 462",
+            milepost: 462.4,
+
+            type: "JUNCTION",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP448: {
+            id: "CP448",
+            name: "CP 448",
+            milepost: 448.6,
+
+            type: "CONTROL_POINT",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP437: {
+            id: "CP437",
+            name: "CP 437",
+            milepost: 437.5,
+
+            type: "JUNCTION",
+
+            /*
+             * Public references identify CP 437 as the
+             * Chicago Line / CN crossing near South Bend.
+             */
+
+            junctions: [
+                "CN_SOUTH_BEND_SUB"
+            ],
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP435: {
+            id: "CP435",
+            name: "CP 435",
+            milepost: 435.4,
+
+            type: "CONTROL_POINT",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP426: {
+            id: "CP426",
+            name: "CP 426",
+            milepost: 426.4,
+
+            type: "CONTROL_POINT",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            /*
+             * Elkhart terminal / yard interface.
+             */
+
+            terminalInterface: true,
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP423: {
+            id: "CP423",
+            name: "CP 423",
+            milepost: 423.1,
+
+            type: "CONTROL_POINT",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2",
+                "MAIN_3"
+            ],
+
+            terminalInterface: true,
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP421: {
+            id: "CP421",
+            name: "CP 421",
+            milepost: 421.5,
+
+            type: "TERMINAL_CONTROL_POINT",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2",
+                "MAIN_3"
+            ],
+
+            terminal: "ELKHART",
+
+            verification: "SOURCE_BACKED"
+        }
+
+    },
+
+
+    /*
+    ========================================================
+    ELKHART TERMINAL
+    ========================================================
+    */
+
+    elkhart: {
+
+        name: "Elkhart Terminal",
+
+        westLimit: "CP421",
+
+        controlPoints: [
+            "CP421",
+            "CP423",
+            "CP426"
+        ],
+
+        mainTracks: [
+            "MAIN_1",
+            "MAIN_2",
+            "MAIN_3"
+        ],
+
+
+        /*
+        ----------------------------------------------------
+        YARD TRACKS
+        ----------------------------------------------------
+        */
+
+        yardTracks: {
+
+            SOUTH_FREIGHT: {
+                id: "SOUTH_FREIGHT",
+                name: "South Freight",
+
+                direction: "WEST",
+
+                connection: "CP421",
+
+                verification: "SOURCE_BACKED_HISTORICAL"
+            },
+
+
+            NORTH_FREIGHT: {
+                id: "NORTH_FREIGHT",
+                name: "North Freight",
+
+                direction: "WEST",
+
+                connection: "CP421",
+
+                verification: "SOURCE_BACKED_HISTORICAL"
+            },
+
+
+            INBOUND_RUNNER: {
+                id: "INBOUND_RUNNER",
+                name: "Inbound Runner",
+
+                direction: "EAST",
+
+                connection: "CP423",
+
+                verification: "SOURCE_BACKED_HISTORICAL"
+            },
+
+
+            EARLY_BIRD: {
+                id: "EARLY_BIRD",
+                name: "Early Bird",
+
+                direction: "WEST",
+
+                connection: "CP426",
+
+                verification: "SOURCE_BACKED_HISTORICAL"
+            }
+
+        },
+
+
+        /*
+        ----------------------------------------------------
+        THIRD MAIN TRACK
+        ----------------------------------------------------
+        */
+
+        thirdMain: {
+
+            id: "MAIN_3",
+
+            from: "CP417",
+
+            to: "ELKHART_TERMINAL",
+
+            purpose: [
+                "MAINLINE_TRAFFIC",
+                "YARD_ACCESS",
+                "DISPATCHER_FLEXIBILITY"
+            ],
+
+            verification: "SOURCE_BACKED"
+        }
+
+    },
+
+
+    /*
+    ========================================================
+    DUNLAP / ELKHART APPROACH
+    ========================================================
+    */
+
+    dunlap: {
+
+        name: "Dunlap / Elkhart Approach",
+
+        type: "SIGNALLED_MAINLINE",
+
+        /*
+         * Historical Dunlap siding ran CP415 → CP421.
+         *
+         * The 2015 project extended this concept into
+         * a third main track and replaced CP415 with
+         * CP417 crossovers.
+         */
+
+        formerSiding: {
+
+            from: "CP415",
+
+            to: "CP421",
+
+            lengthFeet: 29310,
+
+            status: "HISTORICAL_CONFIGURATION"
+
+        },
+
+
+        currentConcept: {
+
+            threeMainTracks: true,
+
+            crossoverControlPoint: "CP417",
+
+            westControlPoint: "CP412",
+
+            verification: "SOURCE_BACKED"
+
+        }
+
+    },
+
+
+    /*
+    ========================================================
+    LOCATIONS
+    ========================================================
+    */
+
+    locations: {
+
+        PORTER: {
+            name: "Porter",
+            milepost: 482.2,
+            type: "JUNCTION"
+        },
+
+        CHESTERTON: {
+            name: "Chesterton",
+            milepost: 481.1,
+            type: "LOCATION"
+        },
+
+        BURDICK: {
+            name: "Burdick",
+            milepost: 476.8,
+            type: "LOCATION"
+        },
+
+        OTIS: {
+            name: "Otis",
+            milepost: 473.4,
+            type: "LOCATION"
+        },
+
+        PINOLA: {
+            name: "Pinola",
+            milepost: 467.5,
+            type: "LOCATION"
+        },
+
+        LA_PORTE: {
+            name: "La Porte",
+            milepost: 463.4,
+            type: "LOCATION"
+        },
+
+        ROLLING_PRAIRIE: {
+            name: "Rolling Prairie",
+            milepost: 456.4,
+            type: "LOCATION"
+        },
+
+        NEW_CARLISLE: {
+            name: "New Carlisle",
+            milepost: 450.1,
+            type: "LOCATION"
+        },
+
+        TERRE_COUPEE: {
+            name: "Terre Coupee",
+            milepost: 448.4,
+            type: "LOCATION"
+        },
+
+        LYDICK: {
+            name: "Lydick",
+            milepost: 443.7,
+            type: "LOCATION"
+        },
+
+        SOUTH_BEND: {
+            name: "South Bend",
+            milepost: 438.5,
+            type: "CITY"
+        },
+
+        MISHAWAKA: {
+            name: "Mishawaka",
+            milepost: 432.7,
+            type: "CITY"
+        },
+
+        ELKHART: {
+            name: "Elkhart",
+            milepost: 421.6,
+            type: "TERMINAL"
+        }
+
+    },
+
+
+    /*
+    ========================================================
+    JUNCTIONS
+    ========================================================
+    */
+
+    junctions: {
+
+        PORTER: {
+            name: "Porter Junction",
+            controlPoint: "CP482",
+
+            connections: [
+                "NS_CHICAGO_LINE",
+                "AMTRAK_MICHIGAN_LINE",
+                "CSX_CONNECTION"
+            ],
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        SOUTH_BEND_CN: {
+            name: "South Bend CN Junction",
+            controlPoint: "CP437",
+
+            connections: [
+                "NS_CHICAGO_LINE",
+                "CN_SOUTH_BEND_SUB"
+            ],
+
+            verification: "SOURCE_BACKED"
+        }
+
+    },
+
+
+    /*
+    ========================================================
+    DETECTORS
+    ========================================================
+
+    We are NOT inventing detector mileposts.
+
+    The system supports them now.
+
+    Verified detector locations will be inserted as
+    they are confirmed from reliable sources.
+    ========================================================
+    */
+
+    detectors: {
+
+        /*
+         * Example schema.
+         *
+         * DO NOT activate until exact location is verified.
+         */
+
+        DETECTOR_TEMPLATE: {
+
+            id: "DD_TEMPLATE",
+
+            type: "DEFECT_DETECTOR",
+
+            milepost: null,
+
+            direction: "BOTH",
+
+            tracks: [],
+
+            announcements: [
+                "NORMAL",
+                "DEFECT"
+            ],
+
+            active: false,
+
+            verification: "NEEDS_VERIFICATION"
+
+        }
+
+    },
+
+
+    /*
+    ========================================================
+    SIGNAL LOCATIONS
+    ========================================================
+
+    The signal engine supports individual signal objects.
+
+    Exact signal locations will be populated from verified
+    current territory information.
+    ========================================================
+    */
+
+    signals: {
+
+        SIGNAL_TEMPLATE: {
+
+            id: "SIGNAL_TEMPLATE",
+
+            milepost: null,
+
+            track: null,
+
+            direction: null,
+
+            type: "UNKNOWN",
+
+            active: false,
+
+            verification: "NEEDS_VERIFICATION"
+
+        }
+
+    },
+
+
+    /*
+    ========================================================
+    CROSSOVERS
+    ========================================================
+    */
+
+    crossovers: {
+
+        CP421: {
+            controlPoint: "CP421",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2",
+                "MAIN_3"
+            ],
+
+            type: "UNIVERSAL",
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP423: {
+            controlPoint: "CP423",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2",
+                "MAIN_3"
+            ],
+
+            type: "TERMINAL_CROSSOVER",
+
+            verification: "SOURCE_BACKED"
+        },
+
+
+        CP426: {
+            controlPoint: "CP426",
+
+            tracks: [
+                "MAIN_1",
+                "MAIN_2"
+            ],
+
+            type: "CONTROLLED_CROSSOVER",
+
+            verification: "SOURCE_BACKED"
+        }
+
+    }
+
+};
+
+
+/*
+============================================================
+INFRASTRUCTURE LOOKUP FUNCTIONS
+============================================================
+*/
+
+
+function getInfrastructureCP(cpId) {
+
+    return INFRASTRUCTURE.controlPoints[cpId] || null;
+
+}
+
+
+function getInfrastructureLocation(name) {
+
+    return INFRASTRUCTURE.locations[name] || null;
+
+}
+
+
+function getYardTrack(trackId) {
+
+    return INFRASTRUCTURE.elkhart.yardTracks[trackId] || null;
+
+}
+
+
+function getCPInfrastructure(cpId) {
+
+    const cp = getInfrastructureCP(cpId);
+
+    if (!cp) {
+
+        return null;
+
+    }
+
+
+    return {
+
+        controlPoint: cp,
+
+        crossovers:
+            INFRASTRUCTURE.crossovers[cpId] || null,
+
+        yard:
+
+            cp.terminalInterface
+                ? INFRASTRUCTURE.elkhart
+                : null
+
+    };
+
+}
+
+
+/*
+============================================================
+TRACK CAPABILITY
+============================================================
+*/
+
+function getAvailableTracks(cpId) {
+
+    const cp = getInfrastructureCP(cpId);
+
+    if (!cp) {
+
+        return [];
+
+    }
+
+    return cp.tracks.filter(
+        track => track !== null
+    );
+
+}
+
+
+/*
+============================================================
+TERMINAL CHECK
+============================================================
+*/
+
+function isTerminal(cpId) {
+
+    const cp = getInfrastructureCP(cpId);
+
+    if (!cp) {
+
+        return false;
+
+    }
+
+    return cp.type === "TERMINAL_CONTROL_POINT";
+
+}
+
+
+/*
+============================================================
+DEBUG
+============================================================
+*/
+
+console.log(
+    "INFRASTRUCTURE DATABASE LOADED"
+);
+
+console.log(
+    "CP 421:",
+    getCPInfrastructure("CP421")
+);
+
+console.log(
+    "Elkhart Yard:",
+    INFRASTRUCTURE.elkhart.yardTracks
+);
+
+console.log(
+    "Available tracks at CP 421:",
+    getAvailableTracks("CP421")
+);
+
+/* =========================================================
+   CONTROL POINT
+   PART 4 — SIGNAL / BLOCK / INTERLOCKING ENGINE
+   ========================================================= */
+
+const SIGNAL_SYSTEM = {
+
+    indications: {
+        STOP: "STOP",
+        RESTRICTING: "RESTRICTING",
+        APPROACH: "APPROACH",
+        MEDIUM_APPROACH: "MEDIUM_APPROACH",
+        MEDIUM_CLEAR: "MEDIUM_CLEAR",
+        CLEAR: "CLEAR"
+    },
+
+    speeds: {
+        STOP: 0,
+        RESTRICTING: 15,
+        APPROACH: 30,
+        MEDIUM_APPROACH: 30,
+        MEDIUM_CLEAR: 40,
+        CLEAR: 60
+    },
+
+    /*
+     * Dispatcher-controlled permissive signals.
+     *
+     * A signal cannot simply become CLEAR because the next
+     * block is empty.
+     *
+     * The route, switches, opposing movements, block
+     * occupancy and route locking all have to agree.
+     */
+};
+
+
+/* =========================================================
+   BLOCK STATE
+   ========================================================= */
+
+const BLOCK_STATE = {
+
+    OCCUPIED: "OCCUPIED",
+    CLEAR: "CLEAR",
+    RESERVED: "RESERVED",
+    MAINTENANCE: "MAINTENANCE"
+};
+
+
+/* =========================================================
+   SIGNAL STATE DATABASE
+   ========================================================= */
+
+const SIGNAL_STATE = {};
+
+
+/*
+ * Create runtime state for every known signal.
+ */
+
+function initializeSignals() {
+
+    for (const signal of Object.values(SIGNALS)) {
+
+        SIGNAL_STATE[signal.id] = {
+
+            id: signal.id,
+
+            indication: SIGNAL_SYSTEM.indications.STOP,
+
+            requestedPermissive: false,
+
+            routeId: null,
+
+            locked: false,
+
+            approachLocked: false,
+
+            occupiedAhead: false,
+
+            conflictingRoute: false,
+
+            switchFailure: false,
+
+            lastChanged: Date.now()
+        };
+    }
+}
+
+
+/* =========================================================
+   BLOCK RUNTIME STATE
+   ========================================================= */
+
+const BLOCK_RUNTIME = {};
+
+
+function initializeBlocks() {
+
+    for (const block of Object.values(BLOCKS)) {
+
+        BLOCK_RUNTIME[block.id] = {
+
+            id: block.id,
+
+            state: BLOCK_STATE.CLEAR,
+
+            occupiedBy: null,
+
+            reservedBy: null,
+
+            reservedRoute: null,
+
+            maintenance: false,
+
+            lastChanged: Date.now()
+        };
+    }
+}
+
+
+/* =========================================================
+   BLOCK OCCUPANCY
+   ========================================================= */
+
+function occupyBlock(blockId, trainId) {
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) return false;
+
+    block.state = BLOCK_STATE.OCCUPIED;
+    block.occupiedBy = trainId;
+    block.lastChanged = Date.now();
+
+    updateSignals();
+
+    return true;
+}
+
+
+function clearBlock(blockId, trainId = null) {
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) return false;
+
+    /*
+     * Prevent one train from accidentally clearing another
+     * train's occupied block.
+     */
+
+    if (
+        trainId !== null &&
+        block.occupiedBy !== null &&
+        block.occupiedBy !== trainId
+    ) {
+        return false;
+    }
+
+    block.state = BLOCK_STATE.CLEAR;
+    block.occupiedBy = null;
+    block.lastChanged = Date.now();
+
+    updateSignals();
+
+    return true;
+}
+
+
+/* =========================================================
+   MAINTENANCE / TRACK & TIME
+   ========================================================= */
+
+function placeMaintenance(blockId) {
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) return false;
+
+    if (block.state === BLOCK_STATE.OCCUPIED) {
+        return false;
+    }
+
+    block.state = BLOCK_STATE.MAINTENANCE;
+    block.maintenance = true;
+
+    updateSignals();
+
+    return true;
+}
+
+
+function removeMaintenance(blockId) {
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) return false;
+
+    block.maintenance = false;
+
+    if (block.occupiedBy) {
+        block.state = BLOCK_STATE.OCCUPIED;
+    } else {
+        block.state = BLOCK_STATE.CLEAR;
+    }
+
+    updateSignals();
+
+    return true;
+}
+
+
+/* =========================================================
+   ROUTE CONFLICT CHECK
+   ========================================================= */
+
+function routeConflicts(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return true;
+
+    for (const activeRoute of Object.values(ROUTES)) {
+
+        if (!activeRoute.active) continue;
+
+        if (activeRoute.id === route.id) continue;
+
+        /*
+         * Shared blocks indicate a potential conflict.
+         */
+
+        const sharedBlock = route.blocks.some(
+            blockId => activeRoute.blocks.includes(blockId)
+        );
+
+        if (sharedBlock) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+/* =========================================================
+   BLOCK AVAILABILITY
+   ========================================================= */
+
+function routeBlocksAvailable(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return false;
+
+    for (const blockId of route.blocks) {
+
+        const block = BLOCK_RUNTIME[blockId];
+
+        if (!block) {
+            return false;
+        }
+
+        if (block.state === BLOCK_STATE.OCCUPIED) {
+            return false;
+        }
+
+        if (block.state === BLOCK_STATE.MAINTENANCE) {
+            return false;
+        }
+
+        if (
+            block.reservedBy !== null &&
+            block.reservedRoute !== routeId
+        ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+/* =========================================================
+   SWITCH POSITION CHECK
+   ========================================================= */
+
+function routeSwitchesCorrect(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return false;
+
+    if (!route.switches) {
+        return true;
+    }
+
+    for (const requiredSwitch of route.switches) {
+
+        const sw = SWITCHES[requiredSwitch.id];
+
+        if (!sw) {
+            return false;
+        }
+
+        if (sw.position !== requiredSwitch.position) {
+            return false;
+        }
+
+        if (sw.locked && sw.lockedBy !== routeId) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+/* =========================================================
+   OPPOSING MOVEMENT CHECK
+   ========================================================= */
+
+function opposingMovement(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return true;
+
+    /*
+     * Check every active route for a movement travelling
+     * against this route.
+     */
+
+    for (const otherRoute of Object.values(ROUTES)) {
+
+        if (!otherRoute.active) continue;
+
+        if (otherRoute.id === route.id) continue;
+
+        if (
+            otherRoute.direction &&
+            route.direction &&
+            otherRoute.direction !== route.direction
+        ) {
+
+            const sharedBlock = route.blocks.some(
+                blockId => otherRoute.blocks.includes(blockId)
+            );
+
+            if (sharedBlock) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+/* =========================================================
+   SIGNAL INDICATION CALCULATION
+   ========================================================= */
+
+function calculateSignal(signalId) {
+
+    const signal = SIGNAL_STATE[signalId];
+
+    if (!signal) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    /*
+     * Default railroad answer:
+     *
+     * If anything is wrong, the signal stays STOP.
+     */
+
+    if (signal.switchFailure) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    if (signal.conflictingRoute) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    /*
+     * Dispatcher has not requested permissive movement.
+     */
+
+    if (!signal.requestedPermissive) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    const route = ROUTES[signal.routeId];
+
+    if (!route) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    /*
+     * Route must physically be correct.
+     */
+
+    if (!routeSwitchesCorrect(route.id)) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    /*
+     * Route cannot enter an occupied or protected block.
+     */
+
+    if (!routeBlocksAvailable(route.id)) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    /*
+     * Opposing movement protection.
+     */
+
+    if (opposingMovement(route.id)) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+
+    /*
+     * Determine what lies ahead.
+     */
+
+    const blocks = route.blocks;
+
+    if (blocks.length === 0) {
+        return SIGNAL_SYSTEM.indications.STOP;
+    }
+
+    let occupiedAhead = false;
+
+    for (const blockId of blocks) {
+
+        const block = BLOCK_RUNTIME[blockId];
+
+        if (!block) {
+            return SIGNAL_SYSTEM.indications.STOP;
+        }
+
+        if (block.state === BLOCK_STATE.OCCUPIED) {
+            occupiedAhead = true;
+            break;
+        }
+    }
+
+
+    /*
+     * Immediate block clear but following block occupied:
+     * APPROACH.
+     */
+
+    if (occupiedAhead) {
+        return SIGNAL_SYSTEM.indications.APPROACH;
+    }
+
+
+    /*
+     * Route is completely clear.
+     */
+
+    return SIGNAL_SYSTEM.indications.CLEAR;
+}
+
+
+/* =========================================================
+   UPDATE ALL SIGNALS
+   ========================================================= */
+
+function updateSignals() {
+
+    for (const signalId of Object.keys(SIGNAL_STATE)) {
+
+        const signal = SIGNAL_STATE[signalId];
+
+        const previous = signal.indication;
+
+        signal.indication = calculateSignal(signalId);
+
+        if (previous !== signal.indication) {
+
+            signal.lastChanged = Date.now();
+
+            console.log(
+                `[SIGNAL] ${signalId}: ` +
+                `${previous} -> ${signal.indication}`
+            );
+        }
+    }
+
+    updateDisplay();
+}
+
+
+/* =========================================================
+   REQUEST SIGNAL PERMISSIVE
+   ========================================================= */
+
+function requestSignal(signalId, routeId) {
+
+    const signal = SIGNAL_STATE[signalId];
+
+    if (!signal) {
+        return {
+            success: false,
+            reason: "SIGNAL_NOT_FOUND"
+        };
+    }
+
+    const route = ROUTES[routeId];
+
+    if (!route) {
+        return {
+            success: false,
+            reason: "ROUTE_NOT_FOUND"
+        };
+    }
+
+
+    /*
+     * Check route conflict before touching anything.
+     */
+
+    if (routeConflicts(routeId)) {
+
+        return {
+            success: false,
+            reason: "ROUTE_CONFLICT"
+        };
+    }
+
+
+    /*
+     * Check blocks.
+     */
+
+    if (!routeBlocksAvailable(routeId)) {
+
+        return {
+            success: false,
+            reason: "BLOCK_UNAVAILABLE"
+        };
+    }
+
+
+    /*
+     * Check switches.
+     */
+
+    if (!routeSwitchesCorrect(routeId)) {
+
+        return {
+            success: false,
+            reason: "SWITCH_POSITION_INCORRECT"
+        };
+    }
+
+
+    /*
+     * Establish the route.
+     */
+
+    signal.routeId = routeId;
+    signal.requestedPermissive = true;
+
+    route.active = true;
+
+
+    /*
+     * Reserve route blocks.
+     */
+
+    for (const blockId of route.blocks) {
+
+        const block = BLOCK_RUNTIME[blockId];
+
+        if (!block) continue;
+
+        block.state = BLOCK_STATE.RESERVED;
+        block.reservedBy = route.trainId || null;
+        block.reservedRoute = routeId;
+    }
+
+
+    /*
+     * Lock route switches.
+     */
+
+    if (route.switches) {
+
+        for (const requiredSwitch of route.switches) {
+
+            const sw = SWITCHES[requiredSwitch.id];
+
+            if (!sw) continue;
+
+            sw.locked = true;
+            sw.lockedBy = routeId;
+        }
+    }
+
+
+    updateSignals();
+
+    return {
+        success: true,
+        signal: signalId,
+        route: routeId,
+        indication: signal.indication
+    };
+}
+
+
+/* =========================================================
+   CANCEL SIGNAL REQUEST
+   ========================================================= */
+
+function cancelSignalRequest(signalId) {
+
+    const signal = SIGNAL_STATE[signalId];
+
+    if (!signal) return false;
+
+    const routeId = signal.routeId;
+
+    signal.requestedPermissive = false;
+    signal.routeId = null;
+
+    if (routeId && ROUTES[routeId]) {
+        ROUTES[routeId].active = false;
+
+        releaseRoute(routeId);
+    }
+
+    updateSignals();
+
+    return true;
+}
+
+
+/* =========================================================
+   RELEASE ROUTE
+   ========================================================= */
+
+function releaseRoute(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return false;
+
+    /*
+     * Release blocks that belong to this route.
+     */
+
+    for (const blockId of route.blocks) {
+
+        const block = BLOCK_RUNTIME[blockId];
+
+        if (!block) continue;
+
+        if (block.reservedRoute === routeId) {
+
+            block.reservedRoute = null;
+            block.reservedBy = null;
+
+            if (block.occupiedBy) {
+                block.state = BLOCK_STATE.OCCUPIED;
+            } else if (block.maintenance) {
+                block.state = BLOCK_STATE.MAINTENANCE;
+            } else {
+                block.state = BLOCK_STATE.CLEAR;
+            }
+        }
+    }
+
+
+    /*
+     * Release switch locks.
+     */
+
+    if (route.switches) {
+
+        for (const requiredSwitch of route.switches) {
+
+            const sw = SWITCHES[requiredSwitch.id];
+
+            if (!sw) continue;
+
+            if (sw.lockedBy === routeId) {
+
+                sw.locked = false;
+                sw.lockedBy = null;
+            }
+        }
+    }
+
+    route.active = false;
+
+    updateSignals();
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN ENTERS ROUTE
+   ========================================================= */
+
+function trainEnterRoute(trainId, routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return false;
+
+    if (!route.active) {
+        return false;
+    }
+
+    route.trainId = trainId;
+
+    /*
+     * The train now owns the route reservation.
+     */
+
+    for (const blockId of route.blocks) {
+
+        const block = BLOCK_RUNTIME[blockId];
+
+        if (!block) continue;
+
+        block.reservedBy = trainId;
+    }
+
+    updateSignals();
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN CLEARS ROUTE
+   ========================================================= */
+
+function trainClearRoute(trainId, routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return false;
+
+    if (route.trainId !== trainId) {
+        return false;
+    }
+
+    route.trainId = null;
+
+    releaseRoute(routeId);
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN MOVEMENT PERMISSION
+   ========================================================= */
+
+function canTrainProceed(trainId, signalId) {
+
+    const signal = SIGNAL_STATE[signalId];
+
+    if (!signal) {
+        return {
+            allowed: false,
+            reason: "SIGNAL_NOT_FOUND"
+        };
+    }
+
+
+    const allowedIndications = [
+
+        SIGNAL_SYSTEM.indications.CLEAR,
+
+        SIGNAL_SYSTEM.indications.APPROACH,
+
+        SIGNAL_SYSTEM.indications.MEDIUM_CLEAR,
+
+        SIGNAL_SYSTEM.indications.MEDIUM_APPROACH,
+
+        SIGNAL_SYSTEM.indications.RESTRICTING
+    ];
+
+
+    if (!allowedIndications.includes(signal.indication)) {
+
+        return {
+            allowed: false,
+            reason: "SIGNAL_AT_STOP",
+            indication: signal.indication
+        };
+    }
+
+
+    /*
+     * Make sure the route belongs to this train when
+     * route ownership is being enforced.
+     */
+
+    if (signal.routeId) {
+
+        const route = ROUTES[signal.routeId];
+
+        if (
+            route &&
+            route.trainId !== null &&
+            route.trainId !== trainId
+        ) {
+
+            return {
+                allowed: false,
+                reason: "ROUTE_BELONGS_TO_OTHER_TRAIN"
+            };
+        }
+    }
+
+
+    return {
+        allowed: true,
+        indication: signal.indication,
+        maximumSpeed:
+            SIGNAL_SYSTEM.speeds[signal.indication]
+    };
+}
+
+
+/* =========================================================
+   INTERLOCKING SAFETY CHECK
+   ========================================================= */
+
+function interlockingSafe(routeId) {
+
+    const route = ROUTES[routeId];
+
+    if (!route) return false;
+
+    /*
+     * Never allow a route through an occupied block.
+     */
+
+    for (const blockId of route.blocks) {
+
+        const block = BLOCK_RUNTIME[blockId];
+
+        if (!block) {
+            return false;
+        }
+
+        if (block.state === BLOCK_STATE.OCCUPIED) {
+            return false;
+        }
+
+        if (block.state === BLOCK_STATE.MAINTENANCE) {
+            return false;
+        }
+    }
+
+
+    /*
+     * Never allow conflicting routes.
+     */
+
+    if (routeConflicts(routeId)) {
+        return false;
+    }
+
+
+    /*
+     * Switches must match the requested route.
+     */
+
+    if (!routeSwitchesCorrect(routeId)) {
+        return false;
+    }
+
+
+    /*
+     * Opposing movement protection.
+     */
+
+    if (opposingMovement(routeId)) {
+        return false;
+    }
+
+    return true;
+}
+
+
+/* =========================================================
+   DEBUG / DISPATCHER VIEW
+   ========================================================= */
+
+function getSignalStatus(signalId) {
+
+    const signal = SIGNAL_STATE[signalId];
+
+    if (!signal) return null;
+
+    return {
+        id: signal.id,
+        indication: signal.indication,
+        route: signal.routeId,
+        permissiveRequested: signal.requestedPermissive,
+        locked: signal.locked
+    };
+}
+
+
+function getBlockStatus(blockId) {
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) return null;
+
+    return {
+        id: block.id,
+        state: block.state,
+        occupiedBy: block.occupiedBy,
+        reservedBy: block.reservedBy,
+        reservedRoute: block.reservedRoute,
+        maintenance: block.maintenance
+    };
+}
+
+
+/* =========================================================
+   INITIALIZE SIGNAL SYSTEM
+   ========================================================= */
+
+initializeSignals();
+initializeBlocks();
+
+console.log("CONTROL POINT Part 4 loaded.");
+console.log("Signal system initialized.");
+console.log("Block system initialized.");
+console.log("Interlocking protection initialized.");
+/* =========================================================
+   CONTROL POINT
+   PART 5 — TRAIN OPERATING SYSTEM
+   ========================================================= */
+
+const TRAIN_STATUS = {
+
+    NOT_STARTED: "NOT_STARTED",
+    WAITING: "WAITING",
+    DEPARTING: "DEPARTING",
+    RUNNING: "RUNNING",
+    APPROACHING: "APPROACHING",
+    HELD: "HELD",
+    RESTRICTED: "RESTRICTED",
+    DELAYED: "DELAYED",
+    STOPPED: "STOPPED",
+    ARRIVED: "ARRIVED",
+    FAILED: "FAILED"
+};
+
+
+/* =========================================================
+   TRAIN TYPES
+   ========================================================= */
+
+const TRAIN_TYPES = {
+
+    INTERMODAL: {
+        name: "Intermodal",
+        priority: 1,
+        defaultSpeed: 60,
+        tonnageRange: [7000, 14000],
+        lengthRange: [6500, 11000]
+    },
+
+    MANIFEST: {
+        name: "Manifest",
+        priority: 2,
+        defaultSpeed: 50,
+        tonnageRange: [5000, 11000],
+        lengthRange: [5000, 9500]
+    },
+
+    AUTO_RACK: {
+        name: "Automotive",
+        priority: 2,
+        defaultSpeed: 50,
+        tonnageRange: [5000, 10000],
+        lengthRange: [5000, 9000]
+    },
+
+    COAL: {
+        name: "Unit Coal",
+        priority: 3,
+        defaultSpeed: 50,
+        tonnageRange: [12000, 18000],
+        lengthRange: [7000, 9500]
+    },
+
+    LOCAL: {
+        name: "Local",
+        priority: 4,
+        defaultSpeed: 40,
+        tonnageRange: [1000, 5000],
+        lengthRange: [1500, 5000]
+    },
+
+    WORK: {
+        name: "Work Train",
+        priority: 5,
+        defaultSpeed: 25,
+        tonnageRange: [1000, 7000],
+        lengthRange: [1000, 6000]
+    },
+
+    AMTRAK: {
+        name: "Amtrak",
+        priority: 1,
+        defaultSpeed: 79,
+        tonnageRange: [1000, 3000],
+        lengthRange: [800, 1800]
+    }
+};
+
+
+/* =========================================================
+   LOCOMOTIVE ROSTER
+   ========================================================= */
+
+const LOCOMOTIVE_POOL = {
+
+    NS: {
+        weight: 70,
+        examples: [
+            "NS ES44AC",
+            "NS ET44AC",
+            "NS SD70ACe",
+            "NS SD70M-2"
+        ]
+    },
+
+    FOREIGN: {
+        weight: 18,
+        examples: [
+            "BNSF ES44DC",
+            "BNSF ES44AC",
+            "CP AC4400CW",
+            "CP ES44AC",
+            "CN ES44DC",
+            "CN ET44AC"
+        ]
+    },
+
+    HERITAGE: {
+        weight: 8,
+        examples: [
+            "NS Heritage Unit",
+            "CSX Heritage Unit",
+            "CN Heritage Unit",
+            "UP Heritage Unit",
+            "CP Heritage Unit"
+        ]
+    },
+
+    RARE: {
+        weight: 2,
+        examples: [
+            "Rare Foreign Leader",
+            "Special Demonstrator",
+            "Unusual Power"
+        ]
+    }
+};
+
+
+/* =========================================================
+   RANDOM HELPERS
+   ========================================================= */
+
+function randomNumber(min, max) {
+
+    return Math.floor(
+        Math.random() * (max - min + 1)
+    ) + min;
+}
+
+
+function randomItem(array) {
+
+    return array[
+        Math.floor(Math.random() * array.length)
+    ];
+}
+
+
+/* =========================================================
+   LOCOMOTIVE GENERATOR
+   ========================================================= */
+
+function generateLocomotive() {
+
+    const roll = Math.random() * 100;
+
+    let category;
+
+    if (roll < 70) {
+        category = "NS";
+    }
+
+    else if (roll < 88) {
+        category = "FOREIGN";
+    }
+
+    else if (roll < 98) {
+        category = "HERITAGE";
+    }
+
+    else {
+        category = "RARE";
+    }
+
+    const model = randomItem(
+        LOCOMOTIVE_POOL[category].examples
+    );
+
+    return {
+
+        category: category,
+
+        model: model,
+
+        roadNumber:
+            randomNumber(1, 9999)
+    };
+}
+
+
+/* =========================================================
+   LOCOMOTIVE CONSIST GENERATOR
+   ========================================================= */
+
+function generateConsist(trainType) {
+
+    let locomotiveCount = 2;
+
+    if (trainType === "COAL") {
+        locomotiveCount = Math.random() < 0.35 ? 3 : 2;
+    }
+
+    if (trainType === "INTERMODAL") {
+        locomotiveCount = Math.random() < 0.25 ? 3 : 2;
+    }
+
+    if (trainType === "AMTRAK") {
+        locomotiveCount = 2;
+    }
+
+    if (trainType === "LOCAL") {
+        locomotiveCount = Math.random() < 0.4 ? 1 : 2;
+    }
+
+
+    const consist = [];
+
+    for (let i = 0; i < locomotiveCount; i++) {
+        consist.push(generateLocomotive());
+    }
+
+
+    /*
+     * Extremely rare heritage-unit duo.
+     *
+     * This is intentionally rare. We do NOT want every
+     * second train becoming a railfan fantasy consist.
+     */
+
+    const heritageCount = consist.filter(
+        loco => loco.category === "HERITAGE"
+    ).length;
+
+    if (
+        Math.random() < 0.02 &&
+        locomotiveCount >= 2
+    ) {
+
+        consist[0] = {
+            category: "HERITAGE",
+            model: "NS Heritage Unit",
+            roadNumber: randomNumber(1000, 9999)
+        };
+
+        consist[1] = {
+            category: "HERITAGE",
+            model: "NS Heritage Unit",
+            roadNumber: randomNumber(1000, 9999)
+        };
+    }
+
+
+    return consist;
+}
+
+
+/* =========================================================
+   TRAIN SYMBOL GENERATOR
+   ========================================================= */
+
+function generateTrainSymbol(type, direction) {
+
+    const prefixes = {
+
+        INTERMODAL: ["I"],
+        MANIFEST: ["M"],
+        AUTO_RACK: ["C"],
+        COAL: ["N"],
+        LOCAL: ["L"],
+        WORK: ["W"],
+        AMTRAK: ["AM"]
+    };
+
+
+    const prefix = randomItem(prefixes[type]);
+
+    const number = randomNumber(1, 999);
+
+    return `${prefix}${number}${direction}`;
+}
+
+
+/* =========================================================
+   TRAIN FACTORY
+   ========================================================= */
+
+function createTrain({
+
+    type = "MANIFEST",
+
+    origin = "Elkhart",
+
+    destination = "Porter",
+
+    direction = "WB",
+
+    departureTime = null
+
+} = {}) {
+
+    const definition = TRAIN_TYPES[type];
+
+    if (!definition) {
+        throw new Error(
+            `Unknown train type: ${type}`
+        );
+    }
+
+
+    const length = randomNumber(
+        definition.lengthRange[0],
+        definition.lengthRange[1]
+    );
+
+
+    const tonnage = randomNumber(
+        definition.tonnageRange[0],
+        definition.tonnageRange[1]
+    );
+
+
+    const consist = generateConsist(type);
+
+
+    const train = {
+
+        /* -------------------------
+           Identity
+        ------------------------- */
+
+        id:
+            `TRAIN-${Date.now()}-${randomNumber(100,999)}`,
+
+        symbol:
+            generateTrainSymbol(type, direction),
+
+        railroad: "NS",
+
+        type: type,
+
+        typeName: definition.name,
+
+
+        /* -------------------------
+           Mission
+        ------------------------- */
+
+        origin: origin,
+
+        destination: destination,
+
+        direction: direction,
+
+
+        /* -------------------------
+           Physical train
+        ------------------------- */
+
+        lengthFeet: length,
+
+        tonnage: tonnage,
+
+        locomotives: consist,
+
+
+        /* -------------------------
+           Operating state
+        ------------------------- */
+
+        status: TRAIN_STATUS.NOT_STARTED,
+
+        currentBlock: null,
+
+        previousBlock: null,
+
+        nextBlock: null,
+
+        currentSignal: null,
+
+        speed: 0,
+
+        maximumSpeed:
+            definition.defaultSpeed,
+
+
+        /* -------------------------
+           Schedule
+        ------------------------- */
+
+        scheduledDeparture:
+            departureTime,
+
+        actualDeparture: null,
+
+        arrivalTime: null,
+
+        delayMinutes: 0,
+
+
+        /* -------------------------
+           Dispatcher interaction
+        ------------------------- */
+
+        authority: null,
+
+        dispatcherInstructions: [],
+
+        crewMessages: [],
+
+
+        /* -------------------------
+           Statistics
+        ------------------------- */
+
+        milesTravelled: 0,
+
+        stops: 0,
+
+        meets: 0,
+
+        holds: 0,
+
+
+        /* -------------------------
+           Mission state
+        ------------------------- */
+
+        missionComplete: false,
+
+        failed: false
+    };
+
+
+    return train;
+}
+
+
+/* =========================================================
+   ACTIVE TRAIN DATABASE
+   ========================================================= */
+
+const TRAINS = {};
+
+
+/* =========================================================
+   ADD TRAIN
+   ========================================================= */
+
+function addTrain(train) {
+
+    if (!train || !train.id) {
+        return false;
+    }
+
+    TRAINS[train.id] = train;
+
+    console.log(
+        `[TRAIN] Added ${train.symbol}`
+    );
+
+    return true;
+}
+
+
+/* =========================================================
+   REMOVE TRAIN
+   ========================================================= */
+
+function removeTrain(trainId) {
+
+    if (!TRAINS[trainId]) {
+        return false;
+    }
+
+    delete TRAINS[trainId];
+
+    return true;
+}
+
+
+/* =========================================================
+   FIND TRAIN
+   ========================================================= */
+
+function getTrain(trainId) {
+
+    return TRAINS[trainId] || null;
+}
+
+
+function findTrainBySymbol(symbol) {
+
+    return Object.values(TRAINS).find(
+        train => train.symbol === symbol
+    ) || null;
+}
+
+
+/* =========================================================
+   TRAIN STATUS
+   ========================================================= */
+
+function setTrainStatus(trainId, status) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+    train.status = status;
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN DEPARTURE
+   ========================================================= */
+
+function departTrain(trainId) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+    if (
+        train.status !== TRAIN_STATUS.NOT_STARTED &&
+        train.status !== TRAIN_STATUS.WAITING
+    ) {
+        return false;
+    }
+
+
+    train.status = TRAIN_STATUS.DEPARTING;
+
+    train.actualDeparture =
+        Date.now();
+
+
+    /*
+     * A train departing without authority is not
+     * automatically allowed to proceed.
+     */
+
+    train.authority = null;
+
+    console.log(
+        `[TRAIN] ${train.symbol} departing`
+    );
+
+    return true;
+}
+
+
+/* =========================================================
+   SIGNAL AUTHORITY
+   ========================================================= */
+
+function giveTrainSignalAuthority(
+    trainId,
+    signalId
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+    const result =
+        canTrainProceed(trainId, signalId);
+
+
+    if (!result.allowed) {
+
+        train.authority = {
+
+            type: "STOP",
+
+            signal: signalId,
+
+            maximumSpeed: 0
+        };
+
+        return false;
+    }
+
+
+    train.authority = {
+
+        type: "SIGNAL",
+
+        signal: signalId,
+
+        indication: result.indication,
+
+        maximumSpeed:
+            result.maximumSpeed
+    };
+
+
+    train.currentSignal = signalId;
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN ENTERS BLOCK
+   ========================================================= */
+
+function trainEnterBlock(
+    trainId,
+    blockId
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) {
+        return false;
+    }
+
+
+    /*
+     * Never allow two trains to occupy the same block.
+     */
+
+    if (
+        block.occupiedBy !== null &&
+        block.occupiedBy !== trainId
+    ) {
+
+        console.warn(
+            `[SAFETY] ${train.symbol} attempted to enter ` +
+            `occupied block ${blockId}`
+        );
+
+        train.status =
+            TRAIN_STATUS.FAILED;
+
+        train.failed = true;
+
+        return false;
+    }
+
+
+    /*
+     * Clear previous block.
+     */
+
+    if (train.currentBlock) {
+
+        clearBlock(
+            train.currentBlock,
+            trainId
+        );
+
+        train.previousBlock =
+            train.currentBlock;
+    }
+
+
+    occupyBlock(
+        blockId,
+        trainId
+    );
+
+
+    train.currentBlock =
+        blockId;
+
+    train.status =
+        TRAIN_STATUS.RUNNING;
+
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN LEAVES BLOCK
+   ========================================================= */
+
+function trainLeaveBlock(
+    trainId,
+    blockId
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) {
+        return false;
+    }
+
+
+    if (block.occupiedBy !== trainId) {
+        return false;
+    }
+
+
+    clearBlock(
+        blockId,
+        trainId
+    );
+
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN SPEED CONTROL
+   ========================================================= */
+
+function updateTrainSpeed(trainId) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return 0;
+    }
+
+
+    /*
+     * No authority means STOP.
+     */
+
+    if (!train.authority) {
+
+        train.speed = 0;
+
+        return 0;
+    }
+
+
+    const permitted =
+        train.authority.maximumSpeed;
+
+
+    if (train.speed > permitted) {
+
+        train.speed = permitted;
+    }
+
+
+    return train.speed;
+}
+
+
+/* =========================================================
+   TRAIN APPROACHING STOP
+   ========================================================= */
+
+function applySignalRestriction(
+    trainId,
+    indication
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    switch (indication) {
+
+        case SIGNAL_SYSTEM.indications.STOP:
+
+            train.maximumSpeed = 0;
+
+            train.status =
+                TRAIN_STATUS.STOPPED;
+
+            break;
+
+
+        case SIGNAL_SYSTEM.indications.APPROACH:
+
+            train.maximumSpeed = 30;
+
+            train.status =
+                TRAIN_STATUS.APPROACHING;
+
+            break;
+
+
+        case SIGNAL_SYSTEM.indications.MEDIUM_APPROACH:
+
+            train.maximumSpeed = 30;
+
+            train.status =
+                TRAIN_STATUS.APPROACHING;
+
+            break;
+
+
+        case SIGNAL_SYSTEM.indications.MEDIUM_CLEAR:
+
+            train.maximumSpeed = 40;
+
+            train.status =
+                TRAIN_STATUS.RUNNING;
+
+            break;
+
+
+        case SIGNAL_SYSTEM.indications.RESTRICTING:
+
+            train.maximumSpeed = 15;
+
+            train.status =
+                TRAIN_STATUS.RESTRICTED;
+
+            break;
+
+
+        case SIGNAL_SYSTEM.indications.CLEAR:
+
+            train.maximumSpeed =
+                TRAIN_TYPES[
+                    train.type
+                ].defaultSpeed;
+
+            train.status =
+                TRAIN_STATUS.RUNNING;
+
+            break;
+    }
+
+
+    updateTrainSpeed(trainId);
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN HOLD
+   ========================================================= */
+
+function holdTrain(
+    trainId,
+    reason = "DISPATCHER"
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    train.status =
+        TRAIN_STATUS.HELD;
+
+    train.speed = 0;
+
+    train.holds++;
+
+    train.dispatcherInstructions.push({
+
+        time: Date.now(),
+
+        type: "HOLD",
+
+        reason: reason
+    });
+
+
+    return true;
+}
+
+
+/* =========================================================
+   RELEASE TRAIN
+   ========================================================= */
+
+function releaseTrain(trainId) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    if (
+        train.status ===
+        TRAIN_STATUS.HELD
+    ) {
+
+        train.status =
+            TRAIN_STATUS.RUNNING;
+    }
+
+
+    return true;
+}
+
+
+/* =========================================================
+   ARRIVAL
+   ========================================================= */
+
+function arriveTrain(trainId) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    train.speed = 0;
+
+    train.status =
+        TRAIN_STATUS.ARRIVED;
+
+    train.arrivalTime =
+        Date.now();
+
+    train.missionComplete = true;
+
+
+    if (train.currentBlock) {
+
+        clearBlock(
+            train.currentBlock,
+            trainId
+        );
+    }
+
+
+    console.log(
+        `[TRAIN] ${train.symbol} arrived at ` +
+        `${train.destination}`
+    );
+
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN FAILURE
+   ========================================================= */
+
+function failTrain(
+    trainId,
+    reason
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    train.status =
+        TRAIN_STATUS.FAILED;
+
+    train.failed = true;
+
+    train.speed = 0;
+
+
+    train.crewMessages.push({
+
+        time: Date.now(),
+
+        type: "FAILURE",
+
+        message: reason
+    });
+
+
+    console.error(
+        `[TRAIN FAILURE] ${train.symbol}: ${reason}`
+    );
+
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN CREW MESSAGE
+   ========================================================= */
+
+function crewMessage(
+    trainId,
+    message
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    train.crewMessages.push({
+
+        time: Date.now(),
+
+        message: message
+    });
+
+
+    console.log(
+        `[RADIO] ${train.symbol}: ${message}`
+    );
+
+
+    return true;
+}
+
+
+/* =========================================================
+   DISPATCHER INSTRUCTION
+   ========================================================= */
+
+function issueInstruction(
+    trainId,
+    instruction
+) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return false;
+    }
+
+
+    train.dispatcherInstructions.push({
+
+        time: Date.now(),
+
+        instruction: instruction
+    });
+
+
+    return true;
+}
+
+
+/* =========================================================
+   TRAIN SUMMARY
+   ========================================================= */
+
+function getTrainSummary(trainId) {
+
+    const train = getTrain(trainId);
+
+    if (!train) {
+        return null;
+    }
+
+
+    return {
+
+        symbol: train.symbol,
+
+        type: train.typeName,
+
+        origin: train.origin,
+
+        destination: train.destination,
+
+        direction: train.direction,
+
+        status: train.status,
+
+        length:
+            `${train.lengthFeet.toLocaleString()} ft`,
+
+        tonnage:
+            `${train.tonnage.toLocaleString()} tons`,
+
+        locomotives:
+            train.locomotives.map(
+                loco =>
+                    `${loco.model} ${loco.roadNumber}`
+            ),
+
+        block:
+            train.currentBlock,
+
+        speed:
+            train.speed,
+
+        maximumSpeed:
+            train.maximumSpeed,
+
+        delay:
+            train.delayMinutes
+    };
+}
+
+
+/* =========================================================
+   LIST ACTIVE TRAINS
+   ========================================================= */
+
+function getActiveTrains() {
+
+    return Object.values(TRAINS)
+        .filter(
+            train =>
+                train.status !==
+                TRAIN_STATUS.ARRIVED &&
+                train.status !==
+                TRAIN_STATUS.FAILED
+        );
+}
+
+
+/* =========================================================
+   SPAWN TEST TRAINS
+   ========================================================= */
+
+function createTestTraffic() {
+
+    const westbound = createTrain({
+
+        type: "INTERMODAL",
+
+        origin: "Elkhart",
+
+        destination: "Porter",
+
+        direction: "WB"
+    });
+
+
+    const eastbound = createTrain({
+
+        type: "MANIFEST",
+
+        origin: "Porter",
+
+        destination: "Elkhart",
+
+        direction: "EB"
+    });
+
+
+    addTrain(westbound);
+
+    addTrain(eastbound);
+
+
+    return {
+
+        westbound,
+
+        eastbound
+    };
+}
+
+
+/* =========================================================
+   TRAIN SYSTEM INITIALIZATION
+   ========================================================= */
+
+console.log(
+    "CONTROL POINT Part 5 loaded."
+);
+
+console.log(
+    "Train operating system initialized."
+);
+   <!-- ======================================================
+     CONTROL POINT
+     PART 7 — DISPATCHER DISPLAY
+     ====================================================== -->
+
+<style>
+
+#dispatcher-screen {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 70px);
+    min-height: 600px;
+    background: #101214;
+    color: #e8e8e8;
+    overflow: hidden;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+
+/* ======================================================
+   TOP DISPATCHER BAR
+   ====================================================== */
+
+#dispatcher-toolbar {
+
+    height: 54px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    padding: 0 14px;
+
+    background: #181b1e;
+
+    border-bottom:
+        1px solid #333;
+
+    box-sizing: border-box;
+}
+
+
+.dispatcher-title {
+
+    font-weight: bold;
+
+    font-size: 16px;
+
+    letter-spacing: 1px;
+
+    white-space: nowrap;
+}
+
+
+.dispatcher-status {
+
+    margin-left: auto;
+
+    display: flex;
+
+    gap: 18px;
+
+    font-size: 12px;
+
+    color: #aaa;
+}
+
+
+/* ======================================================
+   MAIN DISPLAY
+   ====================================================== */
+
+#railroad-display {
+
+    position: absolute;
+
+    left: 0;
+
+    right: 330px;
+
+    top: 54px;
+
+    bottom: 0;
+
+    overflow: auto;
+
+    background:
+        #0d0f11;
+}
+
+
+/* ======================================================
+   SCHEMATIC
+   ====================================================== */
+
+#railroad-canvas {
+
+    position: relative;
+
+    min-width: 1500px;
+
+    height: 900px;
+
+    margin: 0;
+
+    background:
+
+        linear-gradient(
+            rgba(255,255,255,.018) 1px,
+            transparent 1px
+        ),
+
+        linear-gradient(
+            90deg,
+            rgba(255,255,255,.018) 1px,
+            transparent 1px
+        );
+
+    background-size:
+        25px 25px;
+}
+
+
+/* ======================================================
+   TRACK
+   ====================================================== */
+
+.cp-track {
+
+    position: absolute;
+
+    height: 4px;
+
+    background: #d7d7d7;
+
+    transform-origin: left center;
+
+    border-radius: 2px;
+
+    z-index: 2;
+}
+
+
+.cp-track.secondary {
+
+    background: #999;
+}
+
+
+.cp-track.occupied {
+
+    background: #d32f2f;
+
+    box-shadow:
+        0 0 7px rgba(211,47,47,.7);
+}
+
+
+.cp-track.route-lined {
+
+    background: #38c86a;
+
+    box-shadow:
+        0 0 8px rgba(56,200,106,.65);
+}
+
+
+.cp-track.maintenance {
+
+    background: #277bd8;
+
+    box-shadow:
+        0 0 8px rgba(39,123,216,.55);
+}
+
+
+/* ======================================================
+   CONTROL POINT
+   ====================================================== */
+
+.cp-marker {
+
+    position: absolute;
+
+    width: 10px;
+
+    height: 10px;
+
+    border:
+        2px solid #ddd;
+
+    background: #111;
+
+    border-radius: 50%;
+
+    transform:
+        translate(-50%, -50%);
+
+    z-index: 8;
+}
+
+
+.cp-marker.active {
+
+    border-color: #43d76b;
+
+    box-shadow:
+        0 0 8px rgba(67,215,107,.7);
+}
+
+
+/* ======================================================
+   CP LABEL
+   ====================================================== */
+
+.cp-label {
+
+    position: absolute;
+
+    transform:
+        translate(-50%, -100%);
+
+    margin-top: -12px;
+
+    font-size: 11px;
+
+    font-weight: bold;
+
+    color: #ddd;
+
+    white-space: nowrap;
+
+    z-index: 10;
+}
+
+
+.cp-milepost {
+
+    position: absolute;
+
+    transform:
+        translateX(-50%);
+
+    margin-top: 10px;
+
+    font-size: 9px;
+
+    color: #777;
+
+    white-space: nowrap;
+
+    z-index: 10;
+}
+
+
+/* ======================================================
+   SIGNAL
+   ====================================================== */
+
+.cp-signal {
+
+    position: absolute;
+
+    width: 12px;
+
+    height: 12px;
+
+    border-radius: 50%;
+
+    border: 2px solid #222;
+
+    z-index: 15;
+
+    box-sizing: border-box;
+}
+
+
+.cp-signal.STOP {
+
+    background: #d92929;
+
+    box-shadow:
+        0 0 8px rgba(217,41,41,.65);
+}
+
+
+.cp-signal.CLEAR {
+
+    background: #32c866;
+
+    box-shadow:
+        0 0 8px rgba(50,200,102,.65);
+}
+
+
+.cp-signal.APPROACH {
+
+    background: #e2b83c;
+
+    box-shadow:
+        0 0 8px rgba(226,184,60,.65);
+}
+
+
+.cp-signal.RESTRICTING {
+
+    background: #c46bdb;
+
+    box-shadow:
+        0 0 8px rgba(196,107,219,.65);
+}
+
+
+/* ======================================================
+   SIGNAL LABEL
+   ====================================================== */
+
+.cp-signal-label {
+
+    position: absolute;
+
+    font-size: 8px;
+
+    color: #888;
+
+    z-index: 16;
+
+    white-space: nowrap;
+}
+
+
+/* ======================================================
+   SWITCH
+   ====================================================== */
+
+.cp-switch {
+
+    position: absolute;
+
+    width: 20px;
+
+    height: 3px;
+
+    background: #ddd;
+
+    transform-origin: left center;
+
+    z-index: 12;
+}
+
+
+.cp-switch.locked {
+
+    background: #e0b93d;
+}
+
+
+/* ======================================================
+   TRAIN
+   ====================================================== */
+
+.cp-train {
+
+    position: absolute;
+
+    min-width: 34px;
+
+    height: 18px;
+
+    padding:
+        2px 5px;
+
+    box-sizing: border-box;
+
+    background: #25282b;
+
+    border:
+        1px solid #777;
+
+    color: #fff;
+
+    font-size: 9px;
+
+    font-weight: bold;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    white-space: nowrap;
+
+    z-index: 30;
+
+    cursor: pointer;
+
+    border-radius: 2px;
+}
+
+
+.cp-train:hover {
+
+    border-color: #fff;
+
+    background: #34383c;
+}
+
+
+.cp-train.intermodal {
+
+    border-left:
+        4px solid #ddd;
+}
+
+
+.cp-train.manifest {
+
+    border-left:
+        4px solid #aaa;
+}
+
+
+.cp-train.amtrak {
+
+    border-left:
+        4px solid #e5c84a;
+}
+
+
+/* ======================================================
+   RIGHT DISPATCHER PANEL
+   ====================================================== */
+
+#dispatcher-panel {
+
+    position: absolute;
+
+    top: 54px;
+
+    right: 0;
+
+    bottom: 0;
+
+    width: 330px;
+
+    background: #181b1e;
+
+    border-left:
+        1px solid #333;
+
+    overflow-y: auto;
+
+    box-sizing: border-box;
+}
+
+
+/* ======================================================
+   PANEL SECTIONS
+   ====================================================== */
+
+.dispatch-section {
+
+    padding: 12px;
+
+    border-bottom:
+        1px solid #303337;
+}
+
+
+.dispatch-section h3 {
+
+    margin:
+        0 0 10px 0;
+
+    font-size: 12px;
+
+    text-transform: uppercase;
+
+    letter-spacing: 1px;
+
+    color: #bbb;
+}
+
+
+/* ======================================================
+   TRAIN LIST
+   ====================================================== */
+
+.dispatch-train {
+
+    padding: 9px;
+
+    margin-bottom: 6px;
+
+    background: #111315;
+
+    border:
+        1px solid #292c30;
+
+    cursor: pointer;
+}
+
+
+.dispatch-train:hover {
+
+    border-color: #777;
+}
+
+
+.dispatch-train-symbol {
+
+    font-weight: bold;
+
+    font-size: 13px;
+}
+
+
+.dispatch-train-details {
+
+    margin-top: 4px;
+
+    font-size: 10px;
+
+    color: #999;
+
+    line-height: 1.5;
+}
+
+
+/* ======================================================
+   SELECTED TRAIN
+   ====================================================== */
+
+#selected-train {
+
+    min-height: 100px;
+
+    font-size: 11px;
+
+    color: #bbb;
+}
+
+
+.selected-symbol {
+
+    font-size: 18px;
+
+    font-weight: bold;
+
+    color: #fff;
+
+    margin-bottom: 8px;
+}
+
+
+/* ======================================================
+   DISPATCHER BUTTONS
+   ====================================================== */
+
+.dispatch-button {
+
+    width: 100%;
+
+    padding: 9px;
+
+    margin-top: 6px;
+
+    background: #25282c;
+
+    border:
+        1px solid #444;
+
+    color: #eee;
+
+    cursor: pointer;
+
+    font-weight: bold;
+
+    font-size: 11px;
+}
+
+
+.dispatch-button:hover {
+
+    background: #30343a;
+}
+
+
+.dispatch-button:active {
+
+    background: #111;
+}
+
+
+/* ======================================================
+   RADIO
+   ====================================================== */
+
+.radio-message {
+
+    padding: 8px;
+
+    background: #101214;
+
+    border-left:
+        3px solid #777;
+
+    margin-bottom: 6px;
+
+    font-size: 10px;
+
+    line-height: 1.4;
+}
+
+
+.radio-symbol {
+
+    color: #fff;
+
+    font-weight: bold;
+}
+
+
+/* ======================================================
+   LEGEND
+   ====================================================== */
+
+.legend-row {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    font-size: 10px;
+
+    margin-bottom: 6px;
+
+    color: #aaa;
+}
+
+
+.legend-color {
+
+    width: 22px;
+
+    height: 4px;
+
+    background: #ddd;
+}
+
+
+.legend-color.red {
+
+    background: #d32f2f;
+}
+
+
+.legend-color.green {
+
+    background: #38c86a;
+}
+
+
+.legend-color.blue {
+
+    background: #277bd8;
+}
+
+
+.legend-color.yellow {
+
+    background: #e2b83c;
+}
+
+
+/* ======================================================
+   RESPONSIVE
+   ====================================================== */
+
+@media (
+    max-width: 900px
+) {
+
+    #dispatcher-panel {
+
+        width: 280px;
+    }
+
+    #railroad-display {
+
+        right: 280px;
+    }
+}
+
+</style>
+
+
+<div id="dispatcher-screen">
+
+    <div id="dispatcher-toolbar">
+
+        <div class="dispatcher-title">
+            CONTROL POINT
+        </div>
+
+        <div>
+            NS CHICAGO LINE
+        </div>
+
+        <div class="dispatcher-status">
+
+            <span id="clock-display">
+                00:00
+            </span>
+
+            <span>
+                ELKHART DISPATCH
+            </span>
+
+            <span id="traffic-count">
+                TRAINS: 0
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================================================
+         RAILROAD DISPLAY
+         ================================================ -->
+
+    <div id="railroad-display">
+
+        <div id="railroad-canvas"></div>
+
+    </div>
+
+
+    <!-- ================================================
+         DISPATCHER PANEL
+         ================================================ -->
+
+    <div id="dispatcher-panel">
+
+        <div class="dispatch-section">
+
+            <h3>
+                Selected Train
+            </h3>
+
+            <div id="selected-train">
+
+                Select a train from the railroad.
+
+            </div>
+
+        </div>
+
+
+        <div class="dispatch-section">
+
+            <h3>
+                Active Traffic
+            </h3>
+
+            <div id="active-trains"></div>
+
+        </div>
+
+
+        <div class="dispatch-section">
+
+            <h3>
+                Radio
+            </h3>
+
+            <div id="radio-log"></div>
+
+        </div>
+
+
+        <div class="dispatch-section">
+
+            <h3>
+                Display Legend
+            </h3>
+
+            <div class="legend-row">
+
+                <div class="legend-color"></div>
+
+                Normal Track
+
+            </div>
+
+            <div class="legend-row">
+
+                <div class="legend-color red"></div>
+
+                Occupied
+
+            </div>
+
+            <div class="legend-row">
+
+                <div class="legend-color green"></div>
+
+                Route Lined
+
+            </div>
+
+            <div class="legend-row">
+
+                <div class="legend-color yellow"></div>
+
+                Approach / Warning
+
+            </div>
+
+            <div class="legend-row">
+
+                <div class="legend-color blue"></div>
+
+                Maintenance / Track & Time
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* ======================================================
+   PART 7 — DISPLAY ENGINE
+   ====================================================== */
+
+const DISPLAY = {
+
+    canvas:
+        document.getElementById(
+            "railroad-canvas"
+        ),
+
+    selectedTrain: null,
+
+    radioMessages: []
+};
+
+
+/* ======================================================
+   SCHEMATIC GEOMETRY
+   ====================================================== */
+
+const SCHEMATIC = {
+
+    left: 90,
+
+    right: 1390,
+
+    topTrackY: 390,
+
+    bottomTrackY: 510
+};
+
+
+/* ======================================================
+   MP → SCREEN POSITION
+   ====================================================== */
+
+function milepostToX(milepost) {
+
+    const west =
+        OPERATING_TERRITORY
+            .westEnd
+            .milepost;
+
+    const east =
+        OPERATING_TERRITORY
+            .eastEnd
+            .milepost;
+
+
+    const fraction =
+        (west - milepost) /
+        (west - east);
+
+
+    return (
+
+        SCHEMATIC.left +
+
+        fraction *
+        (
+            SCHEMATIC.right -
+            SCHEMATIC.left
+        )
+    );
+}
+
+
+/* ======================================================
+   CREATE ELEMENT
+   ====================================================== */
+
+function createDisplayElement(
+    tag,
+    className
+) {
+
+    const element =
+        document.createElement(tag);
+
+    element.className =
+        className;
+
+    return element;
+}
+
+
+/* ======================================================
+   DRAW TRACK
+   ====================================================== */
+
+function drawTrack(
+    x1,
+    y1,
+    x2,
+    y2,
+    className = "cp-track"
+) {
+
+    const track =
+        createDisplayElement(
+            "div",
+            className
+        );
+
+
+    const dx =
+        x2 - x1;
+
+    const dy =
+        y2 - y1;
+
+
+    const length =
+        Math.sqrt(
+            dx * dx +
+            dy * dy
+        );
+
+
+    const angle =
+        Math.atan2(
+            dy,
+            dx
+        ) *
+        180 /
+        Math.PI;
+
+
+    track.style.left =
+        `${x1}px`;
+
+    track.style.top =
+        `${y1}px`;
+
+    track.style.width =
+        `${length}px`;
+
+    track.style.transform =
+        `rotate(${angle}deg)`;
+
+
+    DISPLAY.canvas.appendChild(
+        track
+    );
+
+
+    return track;
+}
+
+
+/* ======================================================
+   DRAW CONTROL POINT
+   ====================================================== */
+
+function drawControlPoint(
+    cp
+) {
+
+    const x =
+        milepostToX(
+            cp.milepost
+        );
+
+
+    const marker =
+        createDisplayElement(
+            "div",
+            "cp-marker"
+        );
+
+
+    marker.style.left =
+        `${x}px`;
+
+    marker.style.top =
+        `${SCHEMATIC.topTrackY}px`;
+
+
+    marker.title =
+        `${cp.id} MP ${cp.milepost}`;
+
+
+    DISPLAY.canvas.appendChild(
+        marker
+    );
+
+
+    const label =
+        createDisplayElement(
+            "div",
+            "cp-label"
+        );
+
+
+    label.style.left =
+        `${x}px`;
+
+    label.style.top =
+        `${SCHEMATIC.topTrackY}px`;
+
+
+    label.textContent =
+        cp.id;
+
+
+    DISPLAY.canvas.appendChild(
+        label
+    );
+
+
+    const mp =
+        createDisplayElement(
+            "div",
+            "cp-milepost"
+        );
+
+
+    mp.style.left =
+        `${x}px`;
+
+    mp.style.top =
+        `${SCHEMATIC.topTrackY}px`;
+
+
+    mp.textContent =
+        `MP ${cp.milepost}`;
+
+
+    DISPLAY.canvas.appendChild(
+        mp
+    );
+}
+
+
+/* ======================================================
+   DRAW LINE LOCATIONS
+   ====================================================== */
+
+function drawLocationLabels() {
+
+    for (
+        const location
+        of LINE_LOCATIONS
+    ) {
+
+        const x =
+            milepostToX(
+                location.milepost
+            );
+
+
+        const label =
+            createDisplayElement(
+                "div",
+                "cp-label"
+            );
+
+
+        label.style.left =
+            `${x}px`;
+
+        label.style.top =
+            `${SCHEMATIC.bottomTrackY + 18}px`;
+
+
+        label.textContent =
+            location.name;
+
+
+        DISPLAY.canvas.appendChild(
+            label
+        );
+    }
+}
+
+
+/* ======================================================
+   DRAW CONTROL POINTS
+   ====================================================== */
+
+function drawAllControlPoints() {
+
+    for (
+        const cp
+        of Object.values(
+            INFRASTRUCTURE.controlPoints
+        )
+    ) {
+
+        drawControlPoint(cp);
+    }
+}
+
+
+/* ======================================================
+   DRAW MAINLINE
+   ====================================================== */
+
+function drawMainline() {
+
+    /*
+     * Two primary tracks.
+     */
+
+    drawTrack(
+
+        SCHEMATIC.left,
+
+        SCHEMATIC.topTrackY,
+
+        SCHEMATIC.right,
+
+        SCHEMATIC.topTrackY
+    );
+
+
+    drawTrack(
+
+        SCHEMATIC.left,
+
+        SCHEMATIC.bottomTrackY,
+
+        SCHEMATIC.right,
+
+        SCHEMATIC.bottomTrackY,
+
+        "cp-track secondary"
+    );
+
+
+    /*
+     * Connect the two tracks at CPs.
+     * This is schematic representation only.
+     */
+
+    for (
+        const cp
+        of Object.values(
+            INFRASTRUCTURE.controlPoints
+        )
+    ) {
+
+        const x =
+            milepostToX(
+                cp.milepost
+            );
+
+
+        drawTrack(
+
+            x - 10,
+
+            SCHEMATIC.topTrackY,
+
+            x + 10,
+
+            SCHEMATIC.bottomTrackY,
+
+            "cp-track"
+        );
+    }
+}
+
+
+/* ======================================================
+   DRAW SIGNALS
+   ====================================================== */
+
+function drawSignals() {
+
+    for (
+        const signal
+        of Object.values(
+            SIGNAL_STATE
+        )
+    ) {
+
+        const source =
+            SIGNALS[
+                signal.id
+            ];
+
+
+        if (!source) {
+            continue;
+        }
+
+
+        if (
+            source.milepost ===
+            undefined
+        ) {
+            continue;
+        }
+
+
+        const x =
+            milepostToX(
+                source.milepost
+            );
+
+
+        const element =
+            createDisplayElement(
+                "div",
+                `cp-signal ${signal.indication}`
+            );
+
+
+        element.style.left =
+            `${x}px`;
+
+        element.style.top =
+            `${SCHEMATIC.topTrackY - 25}px`;
+
+
+        element.title =
+            `${signal.id}: ${signal.indication}`;
+
+
+        DISPLAY.canvas.appendChild(
+            element
+        );
+
+
+        const label =
+            createDisplayElement(
+                "div",
+                "cp-signal-label"
+            );
+
+
+        label.style.left =
+            `${x - 5}px`;
+
+        label.style.top =
+            `${SCHEMATIC.topTrackY - 42}px`;
+
+
+        label.textContent =
+            signal.id;
+
+
+        DISPLAY.canvas.appendChild(
+            label
+        );
+    }
+}
+
+
+/* ======================================================
+   TRAIN SCREEN POSITION
+   ====================================================== */
+
+function getTrainScreenPosition(
+    train
+) {
+
+    if (
+        train.currentMilepost ===
+        undefined
+    ) {
+        return null;
+    }
+
+
+    const x =
+        milepostToX(
+            train.currentMilepost
+        );
+
+
+    const y =
+        train.direction === "EB"
+
+            ? SCHEMATIC.bottomTrackY
+
+            : SCHEMATIC.topTrackY;
+
+
+    return {
+        x,
+        y
+    };
+}
+
+
+/* ======================================================
+   DRAW TRAIN
+   ====================================================== */
+
+function drawTrain(
+    train
+) {
+
+    const position =
+        getTrainScreenPosition(
+            train
+        );
+
+
+    if (!position) {
+        return;
+    }
+
+
+    const element =
+        createDisplayElement(
+            "div",
+            `cp-train ${train.type.toLowerCase()}`
+        );
+
+
+    element.style.left =
+        `${position.x - 17}px`;
+
+    element.style.top =
+        `${position.y - 9}px`;
+
+
+    element.textContent =
+        train.symbol;
+
+
+    element.title =
+        `${train.symbol} | ` +
+        `${train.typeName} | ` +
+        `${train.direction}`;
+
+
+    element.addEventListener(
+        "click",
+        () => {
+
+            selectTrain(
+                train.id
+            );
+        }
+    );
+
+
+    DISPLAY.canvas.appendChild(
+        element
+    );
+}
+
+
+/* ======================================================
+   DRAW ALL TRAINS
+   ====================================================== */
+
+function drawAllTrains() {
+
+    for (
+        const train
+        of getActiveTrains()
+    ) {
+
+        drawTrain(train);
+    }
+}
+
+
+/* ======================================================
+   SELECT TRAIN
+   ====================================================== */
+
+function selectTrain(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return;
+    }
+
+
+    DISPLAY.selectedTrain =
+        trainId;
+
+
+    renderSelectedTrain();
+
+    renderActiveTrains();
+}
+
+
+/* ======================================================
+   SELECTED TRAIN PANEL
+   ====================================================== */
+
+function renderSelectedTrain() {
+
+    const panel =
+        document.getElementById(
+            "selected-train"
+        );
+
+
+    const train =
+        getTrain(
+            DISPLAY.selectedTrain
+        );
+
+
+    if (!train) {
+
+        panel.textContent =
+            "Select a train from the railroad.";
+
+        return;
+    }
+
+
+    panel.innerHTML = `
+
+        <div class="selected-symbol">
+            ${train.symbol}
+        </div>
+
+        <div>
+            ${train.typeName}
+        </div>
+
+        <div>
+            ${train.origin}
+            →
+            ${train.destination}
+        </div>
+
+        <div>
+            ${train.direction}
+        </div>
+
+        <div>
+            ${train.lengthFeet.toLocaleString()}
+            ft /
+            ${train.tonnage.toLocaleString()}
+            tons
+        </div>
+
+        <div>
+            Status:
+            ${train.status}
+        </div>
+
+        <div>
+            Speed:
+            ${train.speed} MPH
+        </div>
+
+        <div>
+            Current:
+            ${train.currentLocation || "Unknown"}
+        </div>
+
+        <button
+            class="dispatch-button"
+            onclick="
+                holdTrain(
+                    '${train.id}',
+                    'Dispatcher hold'
+                );
+                refreshDispatcher();
+            "
+        >
+            HOLD TRAIN
+        </button>
+
+        <button
+            class="dispatch-button"
+            onclick="
+                releaseTrain(
+                    '${train.id}'
+                );
+                refreshDispatcher();
+            "
+        >
+            RELEASE TRAIN
+        </button>
+    `;
+}
+
+
+/* ======================================================
+   ACTIVE TRAIN LIST
+   ====================================================== */
+
+function renderActiveTrains() {
+
+    const panel =
+        document.getElementById(
+            "active-trains"
+        );
+
+
+    panel.innerHTML = "";
+
+
+    for (
+        const train
+        of getActiveTrains()
+    ) {
+
+        const element =
+            createDisplayElement(
+                "div",
+                "dispatch-train"
+            );
+
+
+        element.innerHTML = `
+
+            <div class="dispatch-train-symbol">
+                ${train.symbol}
+            </div>
+
+            <div class="dispatch-train-details">
+
+                ${train.typeName}<br>
+
+                ${train.origin}
+                →
+                ${train.destination}<br>
+
+                ${train.direction}
+                |
+                ${train.status}
+
+            </div>
+        `;
+
+
+        element.addEventListener(
+            "click",
+            () => {
+
+                selectTrain(
+                    train.id
+                );
+            }
+        );
+
+
+        panel.appendChild(
+            element
+        );
+    }
+
+
+    document.getElementById(
+        "traffic-count"
+    ).textContent =
+
+        `TRAINS: ${
+            getActiveTrains().length
+        }`;
+}
+
+
+/* ======================================================
+   RADIO LOG
+   ====================================================== */
+
+function addRadioMessage(
+    symbol,
+    message
+) {
+
+    DISPLAY.radioMessages.unshift({
+
+        symbol: symbol,
+
+        message: message,
+
+        time: new Date()
+    });
+
+
+    DISPLAY.radioMessages =
+        DISPLAY.radioMessages.slice(
+            0,
+            20
+        );
+
+
+    renderRadioLog();
+}
+
+
+function renderRadioLog() {
+
+    const panel =
+        document.getElementById(
+            "radio-log"
+        );
+
+
+    panel.innerHTML = "";
+
+
+    for (
+        const radio
+        of DISPLAY.radioMessages
+    ) {
+
+        const element =
+            createDisplayElement(
+                "div",
+                "radio-message"
+            );
+
+
+        element.innerHTML = `
+
+            <span class="radio-symbol">
+                ${radio.symbol}:
+            </span>
+
+            ${radio.message}
+        `;
+
+
+        panel.appendChild(
+            element
+        );
+    }
+}
+
+
+/* ======================================================
+   COMPLETE DISPLAY REDRAW
+   ====================================================== */
+
+function renderRailroad() {
+
+    DISPLAY.canvas.innerHTML = "";
+
+
+    drawMainline();
+
+    drawLocationLabels();
+
+    drawAllControlPoints();
+
+    drawSignals();
+
+    drawAllTrains();
+}
+
+
+/* ======================================================
+   DISPATCHER REFRESH
+   ====================================================== */
+
+function refreshDispatcher() {
+
+    renderRailroad();
+
+    renderSelectedTrain();
+
+    renderActiveTrains();
+
+    renderRadioLog();
+}
+
+
+/* ======================================================
+   INITIAL DISPLAY
+   ====================================================== */
+
+refreshDispatcher();
+
+
+console.log(
+    "CONTROL POINT Part 7 loaded."
+);
+
+console.log(
+    "ATCS-style dispatcher display initialized."
+);
+
+<!-- ======================================================
+     CONTROL POINT
+     PART 8 — DISPATCHER CONTROL SYSTEM
+     ====================================================== -->
+
+<style>
+
+/* ======================================================
+   CONTROL PANEL
+   ====================================================== */
+
+#control-panel {
+
+    padding: 12px;
+
+    background: #121416;
+
+    border-bottom:
+        1px solid #303337;
+}
+
+
+/* ======================================================
+   CONTROL PANEL TITLE
+   ====================================================== */
+
+.control-title {
+
+    font-size: 12px;
+
+    font-weight: bold;
+
+    letter-spacing: 1px;
+
+    text-transform: uppercase;
+
+    color: #aaa;
+
+    margin-bottom: 10px;
+}
+
+
+/* ======================================================
+   CONTROL ROW
+   ====================================================== */
+
+.control-row {
+
+    display: flex;
+
+    gap: 6px;
+
+    margin-bottom: 6px;
+}
+
+
+.control-row button {
+
+    flex: 1;
+
+    min-width: 0;
+
+    padding: 8px 5px;
+
+    background: #22262a;
+
+    border:
+        1px solid #41454a;
+
+    color: #ddd;
+
+    font-size: 10px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+
+.control-row button:hover {
+
+    background: #30353a;
+
+    border-color: #777;
+}
+
+
+.control-row button:disabled {
+
+    opacity: .35;
+
+    cursor: not-allowed;
+}
+
+
+/* ======================================================
+   CONTROL STATUS
+   ====================================================== */
+
+#control-status {
+
+    padding: 8px;
+
+    margin-top: 8px;
+
+    background: #0c0e10;
+
+    border:
+        1px solid #292d31;
+
+    font-size: 10px;
+
+    color: #aaa;
+
+    line-height: 1.5;
+}
+
+
+/* ======================================================
+   ROUTE CARD
+   ====================================================== */
+
+.route-card {
+
+    padding: 8px;
+
+    margin-bottom: 6px;
+
+    background: #111315;
+
+    border:
+        1px solid #2e3236;
+
+    cursor: pointer;
+}
+
+
+.route-card:hover {
+
+    border-color: #777;
+}
+
+
+.route-card.active {
+
+    border-color: #36c968;
+
+    background: #142319;
+}
+
+
+.route-name {
+
+    font-size: 11px;
+
+    font-weight: bold;
+
+    color: #eee;
+}
+
+
+.route-details {
+
+    margin-top: 4px;
+
+    font-size: 9px;
+
+    color: #888;
+
+    line-height: 1.4;
+}
+
+
+/* ======================================================
+   SWITCH STATUS
+   ====================================================== */
+
+.switch-card {
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 7px;
+
+    margin-bottom: 4px;
+
+    background: #111315;
+
+    border:
+        1px solid #292d31;
+
+    font-size: 10px;
+}
+
+
+.switch-position {
+
+    font-weight: bold;
+
+    color: #ddd;
+}
+
+
+.switch-position.NORMAL {
+
+    color: #bbb;
+}
+
+
+.switch-position.REVERSE {
+
+    color: #e2b83c;
+}
+
+
+.switch-position.LOCKED {
+
+    color: #e2b83c;
+}
+
+
+/* ======================================================
+   SAFETY MESSAGE
+   ====================================================== */
+
+.dispatch-alert {
+
+    padding: 8px;
+
+    margin-bottom: 6px;
+
+    border-left:
+        3px solid #d32f2f;
+
+    background: #211416;
+
+    color: #ddd;
+
+    font-size: 10px;
+
+    line-height: 1.4;
+}
+
+
+.dispatch-success {
+
+    border-left-color:
+        #38c86a;
+
+    background: #142218;
+}
+
+
+</style>
+
+
+<script>
+
+/* ======================================================
+   PART 8 — DISPATCHER CONTROL SYSTEM
+   ====================================================== */
+
+const DISPATCHER = {
+
+    selectedCP: null,
+
+    selectedSignal: null,
+
+    selectedRoute: null,
+
+    selectedSwitch: null,
+
+    selectedTrain: null,
+
+    messages: []
+};
+
+
+/* ======================================================
+   DISPATCHER MESSAGE
+   ====================================================== */
+
+function dispatcherMessage(
+    message,
+    type = "normal"
+) {
+
+    DISPATCHER.messages.unshift({
+
+        time: Date.now(),
+
+        message: message,
+
+        type: type
+    });
+
+
+    DISPATCHER.messages =
+        DISPATCHER.messages.slice(
+            0,
+            30
+        );
+
+
+    renderDispatcherMessages();
+}
+
+
+/* ======================================================
+   MESSAGE DISPLAY
+   ====================================================== */
+
+function renderDispatcherMessages() {
+
+    let panel =
+        document.getElementById(
+            "dispatcher-messages"
+        );
+
+
+    if (!panel) {
+
+        panel =
+            document.createElement(
+                "div"
+            );
+
+        panel.id =
+            "dispatcher-messages";
+
+        panel.style.padding =
+            "8px";
+
+        panel.style.borderBottom =
+            "1px solid #303337";
+
+        document.getElementById(
+            "dispatcher-panel"
+        ).prepend(panel);
+    }
+
+
+    panel.innerHTML = "";
+
+
+    for (
+        const message
+        of DISPATCHER.messages
+    ) {
+
+        const element =
+            document.createElement(
+                "div"
+            );
+
+
+        element.className =
+            message.type === "error"
+                ? "dispatch-alert"
+                : message.type === "success"
+                    ? "dispatch-alert dispatch-success"
+                    : "radio-message";
+
+
+        element.textContent =
+            message.message;
+
+
+        panel.appendChild(
+            element
+        );
+    }
+}
+
+
+/* ======================================================
+   SELECT CONTROL POINT
+   ====================================================== */
+
+function selectControlPoint(
+    cpId
+) {
+
+    const cp =
+        INFRASTRUCTURE.controlPoints[
+            cpId
+        ];
+
+
+    if (!cp) {
+
+        dispatcherMessage(
+            `Control point ${cpId} not found.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    DISPATCHER.selectedCP =
+        cpId;
+
+
+    DISPATCHER.selectedSignal =
+        null;
+
+    DISPATCHER.selectedSwitch =
+        null;
+
+
+    dispatcherMessage(
+
+        `${cpId} selected. ` +
+        `MP ${cp.milepost}.`,
+
+        "success"
+    );
+
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   SELECT SIGNAL
+   ====================================================== */
+
+function selectSignal(
+    signalId
+) {
+
+    const signal =
+        SIGNAL_STATE[signalId];
+
+
+    if (!signal) {
+
+        dispatcherMessage(
+            `Signal ${signalId} not found.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    DISPATCHER.selectedSignal =
+        signalId;
+
+
+    dispatcherMessage(
+
+        `${signalId} selected. ` +
+        `Indication: ${signal.indication}.`,
+
+        "success"
+    );
+
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   SELECT SWITCH
+   ====================================================== */
+
+function selectSwitch(
+    switchId
+) {
+
+    const sw =
+        SWITCHES[switchId];
+
+
+    if (!sw) {
+
+        dispatcherMessage(
+            `Switch ${switchId} not found.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    DISPATCHER.selectedSwitch =
+        switchId;
+
+
+    dispatcherMessage(
+
+        `${switchId} selected. ` +
+        `Position: ${sw.position}.`,
+
+        "success"
+    );
+
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   SELECT ROUTE
+   ====================================================== */
+
+function selectRoute(
+    routeId
+) {
+
+    const route =
+        ROUTES[routeId];
+
+
+    if (!route) {
+
+        dispatcherMessage(
+            `Route ${routeId} not found.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    DISPATCHER.selectedRoute =
+        routeId;
+
+
+    dispatcherMessage(
+
+        `Route ${routeId} selected.`,
+
+        "success"
+    );
+
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   CHECK SWITCH SAFETY
+   ====================================================== */
+
+function canThrowSwitch(
+    switchId
+) {
+
+    const sw =
+        SWITCHES[switchId];
+
+
+    if (!sw) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "SWITCH_NOT_FOUND"
+        };
+    }
+
+
+    /*
+     * Locked switches cannot be thrown.
+     */
+
+    if (sw.locked) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "SWITCH_LOCKED"
+        };
+    }
+
+
+    /*
+     * Look for active routes using this switch.
+     */
+
+    for (
+        const route
+        of Object.values(
+            ROUTES
+        )
+    ) {
+
+        if (!route.active) {
+            continue;
+        }
+
+
+        if (!route.switches) {
+            continue;
+        }
+
+
+        const usesSwitch =
+            route.switches.some(
+                required =>
+                    required.id ===
+                    switchId
+            );
+
+
+        if (usesSwitch) {
+
+            return {
+
+                allowed: false,
+
+                reason:
+                    "SWITCH_PROTECTED_BY_ROUTE"
+            };
+        }
+    }
+
+
+    return {
+
+        allowed: true
+    };
+}
+
+
+/* ======================================================
+   THROW SWITCH
+   ====================================================== */
+
+function throwSwitch(
+    switchId,
+    position
+) {
+
+    const sw =
+        SWITCHES[switchId];
+
+
+    if (!sw) {
+
+        dispatcherMessage(
+            `Switch ${switchId} does not exist.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    const safety =
+        canThrowSwitch(
+            switchId
+        );
+
+
+    if (!safety.allowed) {
+
+        dispatcherMessage(
+
+            `${switchId} cannot be thrown: ` +
+            `${safety.reason}.`,
+
+            "error"
+        );
+
+        return false;
+    }
+
+
+    if (
+        position !== "NORMAL" &&
+        position !== "REVERSE"
+    ) {
+
+        dispatcherMessage(
+            "Invalid switch position.",
+            "error"
+        );
+
+        return false;
+    }
+
+
+    sw.position =
+        position;
+
+
+    dispatcherMessage(
+
+        `${switchId} lined ${position}.`,
+
+        "success"
+    );
+
+
+    updateSignals();
+
+    renderRailroad();
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   ROUTE SAFETY CHECK
+   ====================================================== */
+
+function validateDispatcherRoute(
+    routeId
+) {
+
+    const route =
+        ROUTES[routeId];
+
+
+    if (!route) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "ROUTE_NOT_FOUND"
+        };
+    }
+
+
+    if (
+        routeConflicts(routeId)
+    ) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "CONFLICTING_ROUTE"
+        };
+    }
+
+
+    if (
+        !routeBlocksAvailable(
+            routeId
+        )
+    ) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "BLOCK_UNAVAILABLE"
+        };
+    }
+
+
+    if (
+        !routeSwitchesCorrect(
+            routeId
+        )
+    ) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "SWITCHES_NOT_LINED"
+        };
+    }
+
+
+    if (
+        opposingMovement(
+            routeId
+        )
+    ) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "OPPOSING_MOVEMENT"
+        };
+    }
+
+
+    return {
+
+        allowed: true
+    };
+}
+
+
+/* ======================================================
+   LINE ROUTE
+   ====================================================== */
+
+function lineRoute(
+    routeId
+) {
+
+    const route =
+        ROUTES[routeId];
+
+
+    if (!route) {
+
+        dispatcherMessage(
+            `Route ${routeId} does not exist.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    const validation =
+        validateDispatcherRoute(
+            routeId
+        );
+
+
+    if (!validation.allowed) {
+
+        dispatcherMessage(
+
+            `Route ${routeId} rejected: ` +
+            `${validation.reason}.`,
+
+            "error"
+        );
+
+        return false;
+    }
+
+
+    /*
+     * Establish route.
+     *
+     * This uses the Part 4 interlocking engine.
+     */
+
+    route.active = true;
+
+
+    /*
+     * Reserve the blocks.
+     */
+
+    for (
+        const blockId
+        of route.blocks
+    ) {
+
+        const block =
+            BLOCK_RUNTIME[blockId];
+
+
+        if (!block) {
+            continue;
+        }
+
+
+        block.state =
+            BLOCK_STATE.RESERVED;
+
+        block.reservedRoute =
+            routeId;
+    }
+
+
+    /*
+     * Lock the switches.
+     */
+
+    if (route.switches) {
+
+        for (
+            const required
+            of route.switches
+        ) {
+
+            const sw =
+                SWITCHES[
+                    required.id
+                ];
+
+
+            if (!sw) {
+                continue;
+            }
+
+
+            sw.position =
+                required.position;
+
+            sw.locked = true;
+
+            sw.lockedBy =
+                routeId;
+        }
+    }
+
+
+    DISPATCHER.selectedRoute =
+        routeId;
+
+
+    dispatcherMessage(
+
+        `Route ${routeId} established.`,
+
+        "success"
+    );
+
+
+    updateSignals();
+
+    renderRailroad();
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   REQUEST PERMISSIVE
+   ====================================================== */
+
+function dispatcherRequestSignal(
+    signalId,
+    routeId,
+    trainId = null
+) {
+
+    const signal =
+        SIGNAL_STATE[signalId];
+
+
+    if (!signal) {
+
+        dispatcherMessage(
+            `Signal ${signalId} not found.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    /*
+     * First establish the route.
+     */
+
+    const routeResult =
+        lineRoute(
+            routeId
+        );
+
+
+    if (!routeResult) {
+        return false;
+    }
+
+
+    /*
+     * Request permissive indication.
+     */
+
+    const result =
+        requestSignal(
+            signalId,
+            routeId
+        );
+
+
+    if (!result.success) {
+
+        dispatcherMessage(
+
+            `${signalId} remains STOP: ` +
+            `${result.reason}.`,
+
+            "error"
+        );
+
+        return false;
+    }
+
+
+    /*
+     * Assign authority to train if one
+     * was selected.
+     */
+
+    if (trainId) {
+
+        giveTrainSignalAuthority(
+            trainId,
+            signalId
+        );
+    }
+
+
+    dispatcherMessage(
+
+        `${signalId} displaying ` +
+        `${signal.indication}.`,
+
+        "success"
+    );
+
+
+    addRadioMessage(
+
+        "DISPATCH",
+
+        `${signalId} ${signal.indication}`
+    );
+
+
+    renderRailroad();
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   RELEASE DISPATCHER ROUTE
+   ====================================================== */
+
+function dispatcherReleaseRoute(
+    routeId
+) {
+
+    if (!ROUTES[routeId]) {
+
+        dispatcherMessage(
+            `Route ${routeId} not found.`,
+            "error"
+        );
+
+        return false;
+    }
+
+
+    releaseRoute(
+        routeId
+    );
+
+
+    dispatcherMessage(
+
+        `Route ${routeId} released.`,
+
+        "success"
+    );
+
+
+    renderRailroad();
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   CONTROL PANEL
+   ====================================================== */
+
+function renderControlPanel() {
+
+    let panel =
+        document.getElementById(
+            "control-panel"
+        );
+
+
+    if (!panel) {
+
+        panel =
+            document.createElement(
+                "div"
+            );
+
+        panel.id =
+            "control-panel";
+
+        document.getElementById(
+            "dispatcher-panel"
+        ).prepend(panel);
+    }
+
+
+    const cp =
+        DISPATCHER.selectedCP
+            ? INFRASTRUCTURE
+                .controlPoints[
+                    DISPATCHER.selectedCP
+                ]
+            : null;
+
+
+    const signal =
+        DISPATCHER.selectedSignal
+            ? SIGNAL_STATE[
+                DISPATCHER.selectedSignal
+            ]
+            : null;
+
+
+    const sw =
+        DISPATCHER.selectedSwitch
+            ? SWITCHES[
+                DISPATCHER.selectedSwitch
+            ]
+            : null;
+
+
+    const route =
+        DISPATCHER.selectedRoute
+            ? ROUTES[
+                DISPATCHER.selectedRoute
+            ]
+            : null;
+
+
+    panel.innerHTML = `
+
+        <div class="control-title">
+            Dispatcher Controls
+        </div>
+
+        <div id="control-status">
+
+            ${
+                cp
+                    ? `CP:
+                       <strong>
+                       ${cp.id}
+                       </strong>
+                       |
+                       MP ${cp.milepost}`
+                    : "No control point selected."
+            }
+
+            <br>
+
+            ${
+                signal
+                    ? `Signal:
+                       <strong>
+                       ${signal.id}
+                       </strong>
+                       |
+                       ${signal.indication}`
+                    : "No signal selected."
+            }
+
+            <br>
+
+            ${
+                sw
+                    ? `Switch:
+                       <strong>
+                       ${sw.id}
+                       </strong>
+                       |
+                       ${sw.position}
+                       ${sw.locked ? " | LOCKED" : ""}`
+                    : "No switch selected."
+            }
+
+            <br>
+
+            ${
+                route
+                    ? `Route:
+                       <strong>
+                       ${route.id}
+                       </strong>
+                       |
+                       ${route.active
+                            ? "ACTIVE"
+                            : "INACTIVE"}`
+                    : "No route selected."
+            }
+
+        </div>
+
+    `;
+}
+
+
+/* ======================================================
+   SWITCH CONTROL PANEL
+   ====================================================== */
+
+function showSwitchControls(
+    switchId
+) {
+
+    selectSwitch(
+        switchId
+    );
+
+
+    const sw =
+        SWITCHES[switchId];
+
+
+    if (!sw) {
+        return;
+    }
+
+
+    const panel =
+        document.getElementById(
+            "control-panel"
+        );
+
+
+    panel.innerHTML += `
+
+        <div class="control-title">
+            Switch ${sw.id}
+        </div>
+
+        <div class="control-row">
+
+            <button
+                onclick="
+                    throwSwitch(
+                        '${sw.id}',
+                        'NORMAL'
+                    )
+                "
+            >
+                NORMAL
+            </button>
+
+            <button
+                onclick="
+                    throwSwitch(
+                        '${sw.id}',
+                        'REVERSE'
+                    )
+                "
+            >
+                REVERSE
+            </button>
+
+        </div>
+
+    `;
+}
+
+
+/* ======================================================
+   ROUTE CONTROL PANEL
+   ====================================================== */
+
+function showRouteControls(
+    routeId
+) {
+
+    selectRoute(
+        routeId
+    );
+
+
+    const route =
+        ROUTES[routeId];
+
+
+    if (!route) {
+        return;
+    }
+
+
+    const panel =
+        document.getElementById(
+            "control-panel"
+        );
+
+
+    panel.innerHTML += `
+
+        <div class="control-title">
+            Route ${route.id}
+        </div>
+
+        <div class="route-details">
+
+            ${route.direction || ""}
+
+            <br>
+
+            Blocks:
+            ${
+                route.blocks
+                    ? route.blocks.join(", ")
+                    : "Not defined"
+            }
+
+        </div>
+
+        <div class="control-row">
+
+            <button
+                onclick="
+                    lineRoute(
+                        '${route.id}'
+                    )
+                "
+            >
+                LINE ROUTE
+            </button>
+
+            <button
+                onclick="
+                    dispatcherReleaseRoute(
+                        '${route.id}'
+                    )
+                "
+            >
+                RELEASE
+            </button>
+
+        </div>
+
+    `;
+}
+
+
+/* ======================================================
+   SIGNAL CONTROL PANEL
+   ====================================================== */
+
+function showSignalControls(
+    signalId
+) {
+
+    selectSignal(
+        signalId
+    );
+
+
+    const signal =
+        SIGNAL_STATE[signalId];
+
+
+    if (!signal) {
+        return;
+    }
+
+
+    const panel =
+        document.getElementById(
+            "control-panel"
+        );
+
+
+    panel.innerHTML += `
+
+        <div class="control-title">
+            Signal ${signal.id}
+        </div>
+
+        <div class="control-row">
+
+            <button
+                onclick="
+                    requestSelectedSignal()
+                "
+            >
+                REQUEST PERMISSIVE
+            </button>
+
+            <button
+                onclick="
+                    cancelSignalRequest(
+                        '${signal.id}'
+                    );
+                    refreshDispatcher();
+                "
+            >
+                CANCEL
+            </button>
+
+        </div>
+
+    `;
+}
+
+
+/* ======================================================
+   REQUEST SELECTED SIGNAL
+   ====================================================== */
+
+function requestSelectedSignal() {
+
+    const signalId =
+        DISPATCHER.selectedSignal;
+
+
+    const routeId =
+        DISPATCHER.selectedRoute;
+
+
+    const trainId =
+        DISPATCHER.selectedTrain;
+
+
+    if (!signalId) {
+
+        dispatcherMessage(
+            "Select a signal first.",
+            "error"
+        );
+
+        return false;
+    }
+
+
+    if (!routeId) {
+
+        dispatcherMessage(
+            "Select a route first.",
+            "error"
+        );
+
+        return false;
+    }
+
+
+    return dispatcherRequestSignal(
+
+        signalId,
+
+        routeId,
+
+        trainId
+    );
+}
+
+
+/* ======================================================
+   SELECTED TRAIN
+   ====================================================== */
+
+function selectDispatcherTrain(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return false;
+    }
+
+
+    DISPATCHER.selectedTrain =
+        trainId;
+
+
+    DISPLAY.selectedTrain =
+        trainId;
+
+
+    dispatcherMessage(
+
+        `${train.symbol} selected.`,
+
+        "success"
+    );
+
+
+    renderSelectedTrain();
+
+    renderControlPanel();
+
+
+    return true;
+}
+
+
+/* ======================================================
+   RADIO DISPATCHER CALL
+   ====================================================== */
+
+function dispatcherCallTrain(
+    trainId,
+    message
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return false;
+    }
+
+
+    addRadioMessage(
+
+        "DISPATCH",
+
+        `${train.symbol}: ${message}`
+    );
+
+
+    issueInstruction(
+        trainId,
+        message
+    );
+
+
+    return true;
+}
+
+
+/* ======================================================
+   DEPARTURE AUTHORIZATION
+   ====================================================== */
+
+function authorizeDeparture(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return false;
+    }
+
+
+    /*
+     * The train must have a signal authority.
+     */
+
+    if (!train.authority) {
+
+        dispatcherMessage(
+
+            `${train.symbol} has no signal authority.`,
+
+            "error"
+        );
+
+        return false;
+    }
+
+
+    train.status =
+        TRAIN_STATUS.DEPARTING;
+
+
+    dispatcherCallTrain(
+
+        trainId,
+
+        "Proceed on signal."
+    );
+
+
+    return true;
+}
+
+
+/* ======================================================
+   DISPATCHER TRAIN CONTROL
+   ====================================================== */
+
+function showTrainControls(
+    trainId
+) {
+
+    selectDispatcherTrain(
+        trainId
+    );
+
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return;
+    }
+
+
+    const panel =
+        document.getElementById(
+            "control-panel"
+        );
+
+
+    panel.innerHTML += `
+
+        <div class="control-title">
+            ${train.symbol}
+        </div>
+
+        <div class="control-row">
+
+            <button
+                onclick="
+                    authorizeDeparture(
+                        '${train.id}'
+                    );
+                    refreshDispatcher();
+                "
+            >
+                AUTHORIZE
+            </button>
+
+            <button
+                onclick="
+                    holdTrain(
+                        '${train.id}',
+                        'Dispatcher'
+                    );
+                    refreshDispatcher();
+                "
+            >
+                HOLD
+            </button>
+
+        </div>
+
+        <div class="control-row">
+
+            <button
+                onclick="
+                    releaseTrain(
+                        '${train.id}'
+                    );
+                    refreshDispatcher();
+                "
+            >
+                RELEASE
+            </button>
+
+        </div>
+
+    `;
+}
+
+
+/* ======================================================
+   HOOK DISPLAY CLICKS
+   ====================================================== */
+
+function installDispatcherClickHandlers() {
+
+    /*
+     * Control point markers.
+     */
+
+    document
+        .querySelectorAll(
+            ".cp-marker"
+        )
+        .forEach(
+            marker => {
+
+                marker.addEventListener(
+                    "click",
+                    () => {
+
+                        const title =
+                            marker.title;
+
+                        const cpId =
+                            title.split(
+                                " "
+                            )[0];
+
+                        selectControlPoint(
+                            cpId
+                        );
+                    }
+                );
+            }
+        );
+
+
+    /*
+     * Trains.
+     */
+
+    document
+        .querySelectorAll(
+            ".cp-train"
+        )
+        .forEach(
+            trainElement => {
+
+                trainElement.addEventListener(
+                    "contextmenu",
+                    event => {
+
+                        event.preventDefault();
+
+                        const symbol =
+                            trainElement
+                                .textContent
+                                .trim();
+
+                        const train =
+                            findTrainBySymbol(
+                                symbol
+                            );
+
+
+                        if (train) {
+
+                            showTrainControls(
+                                train.id
+                            );
+                        }
+                    }
+                );
+            }
+        );
+    }
+
+
+/* ======================================================
+   ENHANCED REFRESH
+   ====================================================== */
+
+const originalRefreshDispatcher =
+    refreshDispatcher;
+
+
+refreshDispatcher = function() {
+
+    originalRefreshDispatcher();
+
+    renderControlPanel();
+
+    installDispatcherClickHandlers();
+};
+
+
+/* ======================================================
+   INITIALIZE PART 8
+   ====================================================== */
+
+renderControlPanel();
+
+renderDispatcherMessages();
+
+installDispatcherClickHandlers();
+
+
+console.log(
+    "CONTROL POINT Part 8 loaded."
+);
+
+console.log(
+    "Dispatcher control system initialized."
+);
+   
+</script>
+
+</body>
+</html>
