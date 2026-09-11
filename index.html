@@ -7710,6 +7710,4245 @@ console.log(
 console.log(
     "Dispatcher control system initialized."
 );
+   /* =========================================================
+   CONTROL POINT
+   PART 9 — TRACK TOPOLOGY / RAILROAD GRAPH
+   ========================================================= */
+
+
+/* =========================================================
+   TRACK GRAPH
+   ========================================================= */
+
+const TRACK_GRAPH = {
+
+    nodes: {},
+
+    edges: {},
+
+    blocks: {},
+
+    initialized: false
+};
+
+
+/* =========================================================
+   NODE TYPES
+   ========================================================= */
+
+const TOPOLOGY_NODE_TYPES = {
+
+    LOCATION: "LOCATION",
+
+    CONTROL_POINT: "CONTROL_POINT",
+
+    BLOCK_ENTRY: "BLOCK_ENTRY",
+
+    BLOCK_EXIT: "BLOCK_EXIT",
+
+    JUNCTION: "JUNCTION",
+
+    TERMINAL: "TERMINAL"
+};
+
+
+/* =========================================================
+   EDGE TYPES
+   ========================================================= */
+
+const TOPOLOGY_EDGE_TYPES = {
+
+    MAINLINE: "MAINLINE",
+
+    CROSSOVER: "CROSSOVER",
+
+    SIDING: "SIDING",
+
+    YARD: "YARD",
+
+    JUNCTION: "JUNCTION"
+};
+
+
+/* =========================================================
+   ADD NODE
+   ========================================================= */
+
+function addTopologyNode({
+
+    id,
+
+    type,
+
+    name = id,
+
+    milepost = null,
+
+    location = null
+
+}) {
+
+    if (!id) {
+        return false;
+    }
+
+
+    TRACK_GRAPH.nodes[id] = {
+
+        id,
+
+        type,
+
+        name,
+
+        milepost,
+
+        location,
+
+        connections: []
+    };
+
+
+    return true;
+}
+
+
+/* =========================================================
+   ADD EDGE
+   ========================================================= */
+
+function addTopologyEdge({
+
+    id,
+
+    from,
+
+    to,
+
+    type = TOPOLOGY_EDGE_TYPES.MAINLINE,
+
+    direction = "BOTH",
+
+    blockId = null,
+
+    distanceMiles = 0,
+
+    speed = null
+
+}) {
+
+    if (
+        !TRACK_GRAPH.nodes[from] ||
+        !TRACK_GRAPH.nodes[to]
+    ) {
+
+        console.warn(
+            `Topology edge ${id} references ` +
+            `an unknown node.`
+        );
+
+        return false;
+    }
+
+
+    TRACK_GRAPH.edges[id] = {
+
+        id,
+
+        from,
+
+        to,
+
+        type,
+
+        direction,
+
+        blockId,
+
+        distanceMiles,
+
+        speed
+    };
+
+
+    TRACK_GRAPH.nodes[
+        from
+    ].connections.push(id);
+
+
+    TRACK_GRAPH.nodes[
+        to
+    ].connections.push(id);
+
+
+    return true;
+}
+
+
+/* =========================================================
+   ADD BLOCK
+   ========================================================= */
+
+function addTopologyBlock({
+
+    id,
+
+    from,
+
+    to,
+
+    track = "T1",
+
+    direction = "BOTH",
+
+    milepostStart = null,
+
+    milepostEnd = null
+
+}) {
+
+    TRACK_GRAPH.blocks[id] = {
+
+        id,
+
+        from,
+
+        to,
+
+        track,
+
+        direction,
+
+        milepostStart,
+
+        milepostEnd,
+
+        occupiedBy: null,
+
+        reservedBy: null,
+
+        maintenance: false
+    };
+
+
+    return true;
+}
+
+
+/* =========================================================
+   INITIALIZE VERIFIED LINE LOCATIONS
+   ========================================================= */
+
+function initializeTopologyLocations() {
+
+    for (
+        const location
+        of LINE_LOCATIONS
+    ) {
+
+        addTopologyNode({
+
+            id:
+                `LOC_${location.id}`,
+
+            type:
+                TOPOLOGY_NODE_TYPES.LOCATION,
+
+            name:
+                location.name,
+
+            milepost:
+                location.milepost,
+
+            location:
+                location.id
+        });
+    }
+}
+
+
+/* =========================================================
+   INITIALIZE CONTROL POINT NODES
+   ========================================================= */
+
+function initializeTopologyControlPoints() {
+
+    for (
+        const cp
+        of Object.values(
+            INFRASTRUCTURE.controlPoints
+        )
+    ) {
+
+        addTopologyNode({
+
+            id:
+                `CP_${cp.id}`,
+
+            type:
+                TOPOLOGY_NODE_TYPES.CONTROL_POINT,
+
+            name:
+                cp.id,
+
+            milepost:
+                cp.milepost
+        });
+    }
+}
+
+
+/* =========================================================
+   CHICAGO LINE MAINLINE SEGMENTS
+   ========================================================= */
+
+/*
+ * These are intentionally represented as a logical
+ * operating graph.
+ *
+ * They are NOT claiming that every physical signal,
+ * crossover or block boundary has been completely
+ * surveyed here.
+ */
+
+const CHICAGO_LINE_SEGMENTS = [
+
+    {
+        id: "SEG_421_426",
+
+        from: "ELKHART",
+
+        to: "CP426",
+
+        distanceMiles: 4.8,
+
+        track: "T1/T2"
+    },
+
+    {
+        id: "SEG_426_435",
+
+        from: "CP426",
+
+        to: "CP435",
+
+        distanceMiles: 9.0,
+
+        track: "T1/T2"
+    },
+
+    {
+        id: "SEG_435_437",
+
+        from: "CP435",
+
+        to: "CP437",
+
+        distanceMiles: 2.1,
+
+        track: "T1/T2"
+    },
+
+    {
+        id: "SEG_437_448",
+
+        from: "CP437",
+
+        to: "CP448",
+
+        distanceMiles: 11.1,
+
+        track: "T1/T2"
+    },
+
+    {
+        id: "SEG_448_462",
+
+        from: "CP448",
+
+        to: "CP462",
+
+        distanceMiles: 13.8,
+
+        track: "T1/T2"
+    },
+
+    {
+        id: "SEG_462_466",
+
+        from: "CP462",
+
+        to: "CP466",
+
+        distanceMiles: 4.2,
+
+        track: "T1/T2"
+    },
+
+    {
+        id: "SEG_466_482",
+
+        from: "CP466",
+
+        to: "CP482",
+
+        distanceMiles: 15.6,
+
+        track: "T1/T2"
+    }
+];
+
+
+/* =========================================================
+   CONNECT MAINLINE SEGMENTS
+   ========================================================= */
+
+function initializeMainlineTopology() {
+
+    for (
+        const segment
+        of CHICAGO_LINE_SEGMENTS
+    ) {
+
+        /*
+         * Find the corresponding topology nodes.
+         */
+
+        let fromNode;
+
+        let toNode;
+
+
+        if (
+            segment.from ===
+            "ELKHART"
+        ) {
+
+            fromNode =
+                TRACK_GRAPH.nodes[
+                    "LOC_ELKHART"
+                ];
+        }
+
+        else {
+
+            fromNode =
+                TRACK_GRAPH.nodes[
+                    `CP_${segment.from}`
+                ];
+        }
+
+
+        toNode =
+            TRACK_GRAPH.nodes[
+                `CP_${segment.to}`
+            ];
+
+
+        /*
+         * Some CPs may not yet have a fully verified
+         * physical node in the infrastructure database.
+         *
+         * Do not invent one silently.
+         */
+
+        if (!fromNode || !toNode) {
+
+            console.warn(
+
+                `Skipping topology segment ` +
+                `${segment.id}: node not verified.`
+            );
+
+            continue;
+        }
+
+
+        addTopologyEdge({
+
+            id:
+                segment.id,
+
+            from:
+                fromNode.id,
+
+            to:
+                toNode.id,
+
+            type:
+                TOPOLOGY_EDGE_TYPES.MAINLINE,
+
+            direction:
+                "BOTH",
+
+            distanceMiles:
+                segment.distanceMiles
+        });
+    }
+}
+
+
+/* =========================================================
+   LOGICAL BLOCK GENERATOR
+   ========================================================= */
+
+function createLogicalBlocks() {
+
+    for (
+        const segment
+        of CHICAGO_LINE_SEGMENTS
+    ) {
+
+        const blockId =
+            `BLK_${segment.id}`;
+
+
+        let fromNode;
+
+        let toNode;
+
+
+        if (
+            segment.from ===
+            "ELKHART"
+        ) {
+
+            fromNode =
+                "LOC_ELKHART";
+        }
+
+        else {
+
+            fromNode =
+                `CP_${segment.from}`;
+        }
+
+
+        toNode =
+            `CP_${segment.to}`;
+
+
+        if (
+            !TRACK_GRAPH.nodes[fromNode] ||
+            !TRACK_GRAPH.nodes[toNode]
+        ) {
+
+            continue;
+        }
+
+
+        addTopologyBlock({
+
+            id:
+                blockId,
+
+            from:
+                fromNode,
+
+            to:
+                toNode,
+
+            track:
+                segment.track,
+
+            direction:
+                "BOTH",
+
+            milepostStart:
+                TRACK_GRAPH
+                    .nodes[fromNode]
+                    .milepost,
+
+            milepostEnd:
+                TRACK_GRAPH
+                    .nodes[toNode]
+                    .milepost
+        });
+
+
+        /*
+         * Link block to its topology edge.
+         */
+
+        const edge =
+            TRACK_GRAPH.edges[
+                segment.id
+            ];
+
+
+        if (edge) {
+
+            edge.blockId =
+                blockId;
+        }
+    }
+}
+
+
+/* =========================================================
+   BLOCK NEIGHBORS
+   ========================================================= */
+
+function getBlockNeighbors(
+    blockId
+) {
+
+    const block =
+        TRACK_GRAPH.blocks[
+            blockId
+        ];
+
+
+    if (!block) {
+        return [];
+    }
+
+
+    const neighbors = [];
+
+
+    for (
+        const other
+        of Object.values(
+            TRACK_GRAPH.blocks
+        )
+    ) {
+
+        if (
+            other.id ===
+            block.id
+        ) {
+            continue;
+        }
+
+
+        if (
+            other.from ===
+            block.to
+        ) {
+
+            neighbors.push({
+
+                blockId:
+                    other.id,
+
+                direction:
+                    "FORWARD"
+            });
+        }
+
+
+        if (
+            other.to ===
+            block.from
+        ) {
+
+            neighbors.push({
+
+                blockId:
+                    other.id,
+
+                direction:
+                    "REVERSE"
+            });
+        }
+    }
+
+
+    return neighbors;
+}
+
+
+/* =========================================================
+   FIND BLOCK AT MILEPOST
+   ========================================================= */
+
+function getTopologyBlockAtMilepost(
+    milepost
+) {
+
+    return Object.values(
+        TRACK_GRAPH.blocks
+    ).find(
+
+        block => {
+
+            if (
+                block.milepostStart ===
+                null ||
+                block.milepostEnd ===
+                null
+            ) {
+
+                return false;
+            }
+
+
+            const high =
+                Math.max(
+                    block.milepostStart,
+                    block.milepostEnd
+                );
+
+
+            const low =
+                Math.min(
+                    block.milepostStart,
+                    block.milepostEnd
+                );
+
+
+            return (
+                milepost >= low &&
+                milepost <= high
+            );
+        }
+
+    ) || null;
+}
+
+
+/* =========================================================
+   FIND ROUTE BETWEEN BLOCKS
+   ========================================================= */
+
+function findBlockPath(
+    startBlockId,
+    destinationBlockId,
+    direction = null
+) {
+
+    if (
+        !TRACK_GRAPH.blocks[
+            startBlockId
+        ] ||
+
+        !TRACK_GRAPH.blocks[
+            destinationBlockId
+        ]
+    ) {
+
+        return null;
+    }
+
+
+    const queue = [
+
+        {
+            blockId:
+                startBlockId,
+
+            path: [
+                startBlockId
+            ]
+        }
+
+    ];
+
+
+    const visited =
+        new Set();
+
+
+    while (
+        queue.length > 0
+    ) {
+
+        const current =
+            queue.shift();
+
+
+        if (
+            current.blockId ===
+            destinationBlockId
+        ) {
+
+            return current.path;
+        }
+
+
+        if (
+            visited.has(
+                current.blockId
+            )
+        ) {
+
+            continue;
+        }
+
+
+        visited.add(
+            current.blockId
+        );
+
+
+        const neighbors =
+            getBlockNeighbors(
+                current.blockId
+            );
+
+
+        for (
+            const neighbor
+            of neighbors
+        ) {
+
+            if (
+                direction &&
+                neighbor.direction !==
+                direction
+            ) {
+
+                continue;
+            }
+
+
+            if (
+                visited.has(
+                    neighbor.blockId
+                )
+            ) {
+
+                continue;
+            }
+
+
+            queue.push({
+
+                blockId:
+                    neighbor.blockId,
+
+                path: [
+                    ...current.path,
+                    neighbor.blockId
+                ]
+            });
+        }
+    }
+
+
+    return null;
+}
+
+
+/* =========================================================
+   TRAIN CURRENT TOPOLOGY BLOCK
+   ========================================================= */
+
+function syncTrainTopology(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return false;
+    }
+
+
+    if (
+        train.currentMilepost ===
+        undefined
+    ) {
+
+        return false;
+    }
+
+
+    const block =
+        getTopologyBlockAtMilepost(
+            train.currentMilepost
+        );
+
+
+    if (!block) {
+        return false;
+    }
+
+
+    train.topologyBlock =
+        block.id;
+
+
+    return true;
+}
+
+
+/* =========================================================
+   GET NEXT TRAIN BLOCK
+   ========================================================= */
+
+function getNextTrainBlock(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return null;
+    }
+
+
+    if (!train.topologyBlock) {
+
+        syncTrainTopology(
+            trainId
+        );
+    }
+
+
+    if (!train.topologyBlock) {
+        return null;
+    }
+
+
+    const block =
+        TRACK_GRAPH.blocks[
+            train.topologyBlock
+        ];
+
+
+    if (!block) {
+        return null;
+    }
+
+
+    const neighbors =
+        getBlockNeighbors(
+            block.id
+        );
+
+
+    /*
+     * Use train direction to determine which
+     * neighboring block is ahead.
+     */
+
+    if (
+        train.direction ===
+        "WB"
+    ) {
+
+        const westward =
+            neighbors.find(
+
+                neighbor => {
+
+                    const candidate =
+                        TRACK_GRAPH.blocks[
+                            neighbor.blockId
+                        ];
+
+                    if (!candidate) {
+                        return false;
+                    }
+
+                    return (
+                        candidate.milepostEnd <
+                        block.milepostStart
+                    );
+                }
+            );
+
+
+        if (westward) {
+            return westward.blockId;
+        }
+    }
+
+
+    if (
+        train.direction ===
+        "EB"
+    ) {
+
+        const eastward =
+            neighbors.find(
+
+                neighbor => {
+
+                    const candidate =
+                        TRACK_GRAPH.blocks[
+                            neighbor.blockId
+                        ];
+
+                    if (!candidate) {
+                        return false;
+                    }
+
+                    return (
+                        candidate.milepostStart >
+                        block.milepostEnd
+                    );
+                }
+            );
+
+
+        if (eastward) {
+            return eastward.blockId;
+        }
+    }
+
+
+    /*
+     * If the simple directional test cannot
+     * identify a block, don't guess.
+     */
+
+    return null;
+}
+
+
+/* =========================================================
+   CAN TRAIN ENTER NEXT BLOCK
+   ========================================================= */
+
+function canEnterNextTopologyBlock(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "TRAIN_NOT_FOUND"
+        };
+    }
+
+
+    const nextBlockId =
+        getNextTrainBlock(
+            trainId
+        );
+
+
+    if (!nextBlockId) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "NO_NEXT_BLOCK"
+        };
+    }
+
+
+    const block =
+        TRACK_GRAPH.blocks[
+            nextBlockId
+        ];
+
+
+    if (!block) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "BLOCK_NOT_FOUND"
+        };
+    }
+
+
+    if (
+        block.occupiedBy !== null &&
+        block.occupiedBy !== trainId
+    ) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "BLOCK_OCCUPIED"
+        };
+    }
+
+
+    if (
+        block.reservedBy !== null &&
+        block.reservedBy !== trainId
+    ) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "BLOCK_RESERVED"
+        };
+    }
+
+
+    if (
+        block.maintenance
+    ) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "BLOCK_MAINTENANCE"
+        };
+    }
+
+
+    return {
+
+        allowed: true,
+
+        blockId:
+            nextBlockId
+    };
+}
+
+
+/* =========================================================
+   ENTER NEXT TOPOLOGY BLOCK
+   ========================================================= */
+
+function enterNextTopologyBlock(
+    trainId
+) {
+
+    const result =
+        canEnterNextTopologyBlock(
+            trainId
+        );
+
+
+    if (!result.allowed) {
+
+        return result;
+    }
+
+
+    const train =
+        getTrain(trainId);
+
+
+    const oldBlock =
+        train.topologyBlock;
+
+
+    const newBlock =
+        result.blockId;
+
+
+    /*
+     * Occupy the new block first.
+     */
+
+    const occupied =
+        trainEnterBlock(
+            trainId,
+            newBlock
+        );
+
+
+    if (!occupied) {
+
+        return {
+
+            allowed: false,
+
+            reason:
+                "BLOCK_ENTRY_REJECTED"
+        };
+    }
+
+
+    /*
+     * Keep topology runtime synchronized.
+     */
+
+    TRACK_GRAPH.blocks[
+        newBlock
+    ].occupiedBy =
+        trainId;
+
+
+    if (
+        oldBlock &&
+        TRACK_GRAPH.blocks[
+            oldBlock
+        ]
+    ) {
+
+        if (
+            TRACK_GRAPH.blocks[
+                oldBlock
+            ].occupiedBy ===
+            trainId
+        ) {
+
+            TRACK_GRAPH.blocks[
+                oldBlock
+            ].occupiedBy =
+                null;
+        }
+    }
+
+
+    train.topologyBlock =
+        newBlock;
+
+
+    return {
+
+        allowed: true,
+
+        blockId:
+            newBlock
+    };
+}
+
+
+/* =========================================================
+   LEAVE CURRENT TOPOLOGY BLOCK
+   ========================================================= */
+
+function leaveTopologyBlock(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return false;
+    }
+
+
+    const blockId =
+        train.topologyBlock;
+
+
+    if (!blockId) {
+        return false;
+    }
+
+
+    const block =
+        TRACK_GRAPH.blocks[
+            blockId
+        ];
+
+
+    if (!block) {
+        return false;
+    }
+
+
+    if (
+        block.occupiedBy ===
+        trainId
+    ) {
+
+        block.occupiedBy =
+            null;
+    }
+
+
+    train.topologyBlock =
+        null;
+
+
+    return true;
+}
+
+
+/* =========================================================
+   INTERLOCKING GRAPH CHECK
+   ========================================================= */
+
+function topologyConflicts(
+    trainId,
+    nextBlockId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return true;
+    }
+
+
+    const nextBlock =
+        TRACK_GRAPH.blocks[
+            nextBlockId
+        ];
+
+
+    if (!nextBlock) {
+        return true;
+    }
+
+
+    /*
+     * Look for opposing trains in the same
+     * physical operating path.
+     */
+
+    for (
+        const other
+        of getActiveTrains()
+    ) {
+
+        if (
+            other.id ===
+            train.id
+        ) {
+
+            continue;
+        }
+
+
+        if (
+            other.direction ===
+            train.direction
+        ) {
+
+            continue;
+        }
+
+
+        if (
+            other.topologyBlock ===
+            nextBlockId
+        ) {
+
+            return true;
+        }
+    }
+
+
+    return false;
+}
+
+
+/* =========================================================
+   TRAIN PATH VALIDATION
+   ========================================================= */
+
+function validateTrainPath(
+    trainId
+) {
+
+    const train =
+        getTrain(trainId);
+
+
+    if (!train) {
+        return false;
+    }
+
+
+    if (
+        !train.routeLocations
+    ) {
+
+        return false;
+    }
+
+
+    /*
+     * Verify the route's location nodes
+     * exist in the topology.
+     */
+
+    for (
+        const locationId
+        of train.routeLocations
+    ) {
+
+        if (
+            !getLocationById(
+                locationId
+            )
+        ) {
+
+            return false;
+        }
+    }
+
+
+    return true;
+}
+
+
+/* =========================================================
+   TOPOLOGY STATUS
+   ========================================================= */
+
+function getTopologyStatus() {
+
+    return {
+
+        nodes:
+            Object.keys(
+                TRACK_GRAPH.nodes
+            ).length,
+
+        edges:
+            Object.keys(
+                TRACK_GRAPH.edges
+            ).length,
+
+        blocks:
+            Object.keys(
+                TRACK_GRAPH.blocks
+            ).length,
+
+        initialized:
+            TRACK_GRAPH.initialized
+    };
+}
+
+
+/* =========================================================
+   DEBUG GRAPH
+   ========================================================= */
+
+function printTopology() {
+
+    console.log(
+        "=== CONTROL POINT TRACK GRAPH ==="
+    );
+
+
+    console.log(
+        "Nodes:",
+        TRACK_GRAPH.nodes
+    );
+
+
+    console.log(
+        "Edges:",
+        TRACK_GRAPH.edges
+    );
+
+
+    console.log(
+        "Blocks:",
+        TRACK_GRAPH.blocks
+    );
+}
+
+
+/* =========================================================
+   INITIALIZE PART 9
+   ========================================================= */
+
+initializeTopologyLocations();
+
+initializeTopologyControlPoints();
+
+initializeMainlineTopology();
+
+createLogicalBlocks();
+
+TRACK_GRAPH.initialized =
+    true;
+
+
+console.log(
+    "CONTROL POINT Part 9 loaded."
+);
+
+console.log(
+    "Track topology initialized."
+);
+
+console.log(
+    getTopologyStatus()
+);
+   /* =========================================================
+   CONTROL POINT
+   PART 10 — SIMULATION CLOCK / TRAIN MOVEMENT ENGINE
+   ========================================================= */
+
+
+/* =========================================================
+   SIMULATION STATE
+   ========================================================= */
+
+const SIMULATION = {
+
+    running: false,
+
+    speedMultiplier: 1,
+
+    currentMinutes: 0,
+
+    startMinutes: 0,
+
+    lastUpdate: null,
+
+    elapsedRealSeconds: 0,
+
+    operatingDayComplete: false,
+
+    operatingDayFailed: false
+};
+
+
+/* =========================================================
+   SIMULATION SPEEDS
+   ========================================================= */
+
+const SIMULATION_SPEEDS = {
+
+    PAUSED: 0,
+
+    REALTIME: 1,
+
+    FAST: 2,
+
+    FASTER: 5,
+
+    VERY_FAST: 10
+};
+
+
+/* =========================================================
+   TIME HELPERS
+   ========================================================= */
+
+function formatSimulationTime(
+    totalMinutes
+) {
+
+    totalMinutes =
+        Math.floor(totalMinutes);
+
+
+    const hours =
+        Math.floor(
+            totalMinutes / 60
+        ) % 24;
+
+
+    const minutes =
+        totalMinutes % 60;
+
+
+    return (
+
+        String(hours).padStart(2, "0") +
+        ":" +
+        String(minutes).padStart(2, "0")
+    );
+}
+
+
+function getSimulationHour() {
+
+    return Math.floor(
+        SIMULATION.currentMinutes / 60
+    ) % 24;
+}
+
+
+/* =========================================================
+   SET SIMULATION SPEED
+   ========================================================= */
+
+function setSimulationSpeed(
+    multiplier
+) {
+
+    if (
+        !Object.values(
+            SIMULATION_SPEEDS
+        ).includes(multiplier)
+    ) {
+
+        return false;
+    }
+
+
+    SIMULATION.speedMultiplier =
+        multiplier;
+
+
+    dispatcherMessage(
+
+        multiplier === 0
+
+            ? "Simulation paused."
+
+            : `Simulation speed: ${multiplier}x.`,
+
+        "success"
+    );
+
+
+    return true;
+}
+
+
+/* =========================================================
+   START SIMULATION
+   ========================================================= */
+
+function startSimulation(
+    startHour = 0,
+    startMinute = 0
+) {
+
+    SIMULATION.currentMinutes =
+        startHour * 60 +
+        startMinute;
+
+
+    SIMULATION.startMinutes =
+        SIMULATION.currentMinutes;
+
+
+    SIMULATION.running =
+        true;
+
+
+    SIMULATION.speedMultiplier =
+        SIMULATION_SPEEDS.REALTIME;
+
+
+    SIMULATION.lastUpdate =
+        performance.now();
+
+
+    SIMULATION.operatingDayComplete =
+        false;
+
+
+    SIMULATION.operatingDayFailed =
+        false;
+
+
+    /*
+     * Generate the day's traffic.
+     */
+
+    generateDailyTraffic(20);
+
+    buildSampleOperatingPlan();
+
+
+    dispatcherMessage(
+
+        `Operating day started at ` +
+        `${formatSimulationTime(
+            SIMULATION.currentMinutes
+        )}.`,
+
+        "success"
+    );
+
+
+    requestAnimationFrame(
+        simulationLoop
+    );
+
+
+    return true;
+}
+
+
+/* =========================================================
+   PAUSE
+   ========================================================= */
+
+function pauseSimulation() {
+
+    SIMULATION.speedMultiplier =
+        SIMULATION_SPEEDS.PAUSED;
+
+
+    SIMULATION.running =
+        false;
+
+
+    dispatcherMessage(
+        "Simulation paused.",
+        "success"
+    );
+}
+
+
+/* =========================================================
+   RESUME
+   ========================================================= */
+
+function resumeSimulation() {
+
+    if (
+        SIMULATION.operatingDayComplete ||
+        SIMULATION.operatingDayFailed
+    ) {
+
+        return false;
+    }
+
+
+    SIMULATION.running =
+        true;
+
+
+    SIMULATION.speedMultiplier =
+        SIMULATION_SPEEDS.REALTIME;
+
+
+    SIMULATION.lastUpdate =
+        performance.now();
+
+
+    requestAnimationFrame(
+        simulationLoop
+    );
+
+
+    dispatcherMessage(
+        "Simulation resumed.",
+        "success"
+    );
+
+
+    return true;
+}
+
+
+/* =========================================================
+   ADVANCE SIMULATION CLOCK
+   ========================================================= */
+
+function updateSimulationClock(
+    deltaSeconds
+) {
+
+    if (
+        !SIMULATION.running ||
+        SIMULATION.speedMultiplier === 0
+    ) {
+
+        return;
+    }
+
+
+    /*
+     * One real second represents one simulation
+     * minute at 1x.
+     *
+     * This keeps the operating session moving
+     * without making the player wait hours.
+     */
+
+    const simulationMinutes =
+        deltaSeconds *
+        SIMULATION.speedMultiplier;
+
+
+    SIMULATION.currentMinutes +=
+        simulationMinutes;
+
+
+    SIMULATION.elapsedRealSeconds +=
+        deltaSeconds;
+}
+
+
+/* =========================================================
+   SCHEDULED TRAFFIC
+   ========================================================= */
+
+function updateScheduledTraffic() {
+
+    activateScheduledTrains(
+        Math.floor(
+            SIMULATION.currentMinutes
+        )
+    );
+}
+
+
+/* =========================================================
+   DISTANCE / SPEED MOVEMENT
+   ========================================================= */
+
+function moveTrainByTime(
+    train,
+    deltaSeconds
+) {
+
+    if (!train) {
+        return;
+    }
+
+
+    if (
+        train.status ===
+            TRAIN_STATUS.HELD ||
+
+        train.status ===
+            TRAIN_STATUS.STOPPED ||
+
+        train.status ===
+            TRAIN_STATUS.FAILED ||
+
+        train.status ===
+            TRAIN_STATUS.ARRIVED
+    ) {
+
+        train.speed = 0;
+
+        return;
+    }
+
+
+    /*
+     * No authority means the train cannot move.
+     */
+
+    if (!train.authority) {
+
+        train.speed = 0;
+
+        train.status =
+            TRAIN_STATUS.WAITING;
+
+        return;
+    }
+
+
+    updateTrainSpeed(
+        train.id
+    );
+
+
+    if (train.speed <= 0) {
+
+        return;
+    }
+
+
+    /*
+     * MPH → miles/second
+     */
+
+    const milesPerSecond =
+        train.speed / 3600;
+
+
+    const milesMoved =
+        milesPerSecond *
+        deltaSeconds *
+        SIMULATION.speedMultiplier;
+
+
+    train.milesTravelled +=
+        milesMoved;
+
+
+    /*
+     * Update the displayed milepost.
+     */
+
+    if (
+        train.direction === "EB"
+    ) {
+
+        train.currentMilepost +=
+            milesMoved;
+    }
+
+    else {
+
+        train.currentMilepost -=
+            milesMoved;
+    }
+
+
+    syncTrainLocationFromMilepost(
+        train
+    );
+
+
+    syncTrainTopology(
+        train.id
+    );
+
+
+    handleTrainBlockTransitions(
+        train
+    );
+}
+
+
+/* =========================================================
+   LOCATION SYNCHRONIZATION
+   ========================================================= */
+
+function syncTrainLocationFromMilepost(
+    train
+) {
+
+    if (
+        train.currentMilepost ===
+        undefined
+    ) {
+
+        return;
+    }
+
+
+    let nearest =
+        null;
+
+
+    let nearestDistance =
+        Infinity;
+
+
+    for (
+        const location
+        of LINE_LOCATIONS
+    ) {
+
+        const distance =
+            Math.abs(
+
+                location.milepost -
+                train.currentMilepost
+            );
+
+
+        if (
+            distance <
+            nearestDistance
+        ) {
+
+            nearest =
+                location;
+
+            nearestDistance =
+                distance;
+        }
+    }
+
+
+    if (nearest) {
+
+        train.currentLocation =
+            nearest.id;
+
+        train.displayLocation =
+            nearest.name;
+    }
+}
+
+
+/* =========================================================
+   BLOCK TRANSITION
+   ========================================================= */
+
+function handleTrainBlockTransitions(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+
+    const currentBlock =
+        train.topologyBlock;
+
+
+    if (!currentBlock) {
+
+        syncTrainTopology(
+            train.id
+        );
+
+        return;
+    }
+
+
+    const block =
+        TRACK_GRAPH.blocks[
+            currentBlock
+        ];
+
+
+    if (!block) {
+        return;
+    }
+
+
+    const high =
+        Math.max(
+            block.milepostStart,
+            block.milepostEnd
+        );
+
+
+    const low =
+        Math.min(
+            block.milepostStart,
+            block.milepostEnd
+        );
+
+
+    /*
+     * Determine whether the train has reached
+     * the end of its current block.
+     */
+
+    const passedEast =
+        train.direction === "EB" &&
+        train.currentMilepost >= high;
+
+
+    const passedWest =
+        train.direction === "WB" &&
+        train.currentMilepost <= low;
+
+
+    if (
+        !passedEast &&
+        !passedWest
+    ) {
+
+        return;
+    }
+
+
+    const result =
+        canEnterNextTopologyBlock(
+            train.id
+        );
+
+
+    if (!result.allowed) {
+
+        /*
+         * Train has reached the limit of its authority.
+         *
+         * Bring it to a controlled stop instead of
+         * allowing it to run through the block.
+         */
+
+        train.speed = 0;
+
+        train.status =
+            TRAIN_STATUS.STOPPED;
+
+
+        crewMessage(
+
+            train.id,
+
+            `Stopped at block limit. ` +
+            `${result.reason}.`
+        );
+
+
+        return;
+    }
+
+
+    const entered =
+        enterNextTopologyBlock(
+            train.id
+        );
+
+
+    if (!entered.allowed) {
+
+        train.speed = 0;
+
+        train.status =
+            TRAIN_STATUS.STOPPED;
+
+        return;
+    }
+
+
+    /*
+     * Recalculate the signal environment.
+     */
+
+    updateSignals();
+
+
+    /*
+     * Update authority.
+     */
+
+    refreshTrainAuthority(
+        train
+    );
+}
+
+
+/* =========================================================
+   REFRESH TRAIN AUTHORITY
+   ========================================================= */
+
+function refreshTrainAuthority(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+
+    if (!train.currentSignal) {
+        return;
+    }
+
+
+    const signal =
+        SIGNAL_STATE[
+            train.currentSignal
+        ];
+
+
+    if (!signal) {
+        return;
+    }
+
+
+    /*
+     * Signal may have changed while the train
+     * was moving.
+     */
+
+    train.authority = {
+
+        type: "SIGNAL",
+
+        signal:
+            signal.id,
+
+        indication:
+            signal.indication,
+
+        maximumSpeed:
+            SIGNAL_SYSTEM.speeds[
+                signal.indication
+            ]
+    };
+
+
+    applySignalRestriction(
+
+        train.id,
+
+        signal.indication
+    );
+}
+
+
+/* =========================================================
+   APPROACHING SIGNAL
+   ========================================================= */
+
+function checkApproachingSignal(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+
+    if (!train.currentSignal) {
+        return;
+    }
+
+
+    const signal =
+        SIGNAL_STATE[
+            train.currentSignal
+        ];
+
+
+    if (!signal) {
+        return;
+    }
+
+
+    /*
+     * Stop indication.
+     */
+
+    if (
+        signal.indication ===
+        SIGNAL_SYSTEM.indications.STOP
+    ) {
+
+        train.maximumSpeed = 0;
+
+        train.speed = 0;
+
+        train.status =
+            TRAIN_STATUS.STOPPED;
+
+
+        return;
+    }
+
+
+    /*
+     * Approach indication.
+     */
+
+    if (
+        signal.indication ===
+        SIGNAL_SYSTEM.indications.APPROACH
+    ) {
+
+        train.maximumSpeed =
+            SIGNAL_SYSTEM
+                .speeds
+                .APPROACH;
+
+
+        train.status =
+            TRAIN_STATUS.APPROACHING;
+    }
+}
+
+
+/* =========================================================
+   UPDATE ALL TRAINS
+   ========================================================= */
+
+function updateTrains(
+    deltaSeconds
+) {
+
+    for (
+        const train
+        of getActiveTrains()
+    ) {
+
+        moveTrainByTime(
+            train,
+            deltaSeconds
+        );
+
+
+        checkApproachingSignal(
+            train
+        );
+
+
+        checkTrainSpacing(
+            train.id
+        );
+    }
+}
+
+
+/* =========================================================
+   AUTOMATIC TRAIN STOP PROTECTION
+   ========================================================= */
+
+function enforceTrainProtection(
+    train
+) {
+
+    if (!train) {
+        return;
+    }
+
+
+    /*
+     * Never allow a train with no authority
+     * to continue moving.
+     */
+
+    if (!train.authority) {
+
+        train.speed = 0;
+
+        train.status =
+            TRAIN_STATUS.STOPPED;
+
+        return;
+    }
+
+
+    /*
+     * Stop protection.
+     */
+
+    if (
+        train.authority.indication ===
+        SIGNAL_SYSTEM.indications.STOP
+    ) {
+
+        train.speed = 0;
+
+        train.status =
+            TRAIN_STATUS.STOPPED;
+    }
+}
+
+
+/* =========================================================
+   SAFETY UPDATE
+   ========================================================= */
+
+function updateSafety() {
+
+    for (
+        const train
+        of getActiveTrains()
+    ) {
+
+        enforceTrainProtection(
+            train
+        );
+    }
+
+
+    updateSignals();
+}
+
+
+/* =========================================================
+   DAY END CHECK
+   ========================================================= */
+
+function checkOperatingDay() {
+
+    if (
+        operatingDayFailed()
+    ) {
+
+        SIMULATION.operatingDayFailed =
+            true;
+
+        SIMULATION.running =
+            false;
+
+
+        dispatcherMessage(
+
+            "OPERATING DAY FAILED. " +
+            "A critical train movement failed.",
+
+            "error"
+        );
+
+
+        return;
+    }
+
+
+    if (
+        operatingDayComplete()
+    ) {
+
+        SIMULATION.operatingDayComplete =
+            true;
+
+        SIMULATION.running =
+            false;
+
+
+        dispatcherMessage(
+
+            "OPERATING DAY COMPLETE.",
+
+            "success"
+        );
+    }
+}
+
+
+/* =========================================================
+   DISPATCHER CLOCK DISPLAY
+   ========================================================= */
+
+function updateClockDisplay() {
+
+    const clock =
+        document.getElementById(
+            "clock-display"
+        );
+
+
+    if (!clock) {
+        return;
+    }
+
+
+    clock.textContent =
+        formatSimulationTime(
+            SIMULATION.currentMinutes
+        );
+}
+
+
+/* =========================================================
+   MAIN SIMULATION TICK
+   ========================================================= */
+
+function simulationTick(
+    deltaSeconds
+) {
+
+    updateSimulationClock(
+        deltaSeconds
+    );
+
+
+    updateScheduledTraffic();
+
+
+    updateTrains(
+        deltaSeconds
+    );
+
+
+    updateSafety();
+
+
+    checkOperatingDay();
+
+
+    updateClockDisplay();
+
+
+    refreshDispatcher();
+}
+
+
+/* =========================================================
+   ANIMATION LOOP
+   ========================================================= */
+
+function simulationLoop(
+    timestamp
+) {
+
+    if (!SIMULATION.running) {
+        return;
+    }
+
+
+    if (
+        !SIMULATION.lastUpdate
+    ) {
+
+        SIMULATION.lastUpdate =
+            timestamp;
+    }
+
+
+    const deltaSeconds =
+        Math.min(
+
+            (
+                timestamp -
+                SIMULATION.lastUpdate
+            ) / 1000,
+
+            1
+        );
+
+
+    SIMULATION.lastUpdate =
+        timestamp;
+
+
+    simulationTick(
+        deltaSeconds
+    );
+
+
+    requestAnimationFrame(
+        simulationLoop
+    );
+}
+
+
+/* =========================================================
+   RESET OPERATING DAY
+   ========================================================= */
+
+function resetOperatingDay() {
+
+    SIMULATION.running =
+        false;
+
+    SIMULATION.currentMinutes =
+        SIMULATION.startMinutes;
+
+
+    SIMULATION.operatingDayComplete =
+        false;
+
+    SIMULATION.operatingDayFailed =
+        false;
+
+
+    /*
+     * Clear active trains.
+     */
+
+    for (
+        const train
+        of Object.values(
+            TRAINS
+        )
+    ) {
+
+        if (
+            train.currentBlock
+        ) {
+
+            clearBlock(
+                train.currentBlock,
+                train.id
+            );
+        }
+    }
+
+
+    for (
+        const trainId
+        of Object.keys(
+            TRAINS
+        )
+    ) {
+
+        delete TRAINS[
+            trainId
+        ];
+    }
+
+
+    /*
+     * Reset block runtime.
+     */
+
+    for (
+        const block
+        of Object.values(
+            BLOCK_RUNTIME
+        )
+    ) {
+
+        block.state =
+            block.maintenance
+
+                ? BLOCK_STATE.MAINTENANCE
+
+                : BLOCK_STATE.CLEAR;
+
+        block.occupiedBy =
+            null;
+
+        block.reservedBy =
+            null;
+
+        block.reservedRoute =
+            null;
+    }
+
+
+    /*
+     * Reset routes.
+     */
+
+    for (
+        const route
+        of Object.values(
+            ROUTES
+        )
+    ) {
+
+        route.active =
+            false;
+
+        route.trainId =
+            null;
+    }
+
+
+    /*
+     * Reset switches.
+     */
+
+    for (
+        const sw
+        of Object.values(
+            SWITCHES
+        )
+    ) {
+
+        sw.locked =
+            false;
+
+        sw.lockedBy =
+            null;
+    }
+
+
+    updateSignals();
+
+
+    dispatcherMessage(
+        "Operating day reset.",
+        "success"
+    );
+
+
+    refreshDispatcher();
+}
+
+
+/* =========================================================
+   SPEED CONTROL UI
+   ========================================================= */
+
+function createSimulationControls() {
+
+    const toolbar =
+        document.getElementById(
+            "dispatcher-toolbar"
+        );
+
+
+    if (!toolbar) {
+        return;
+    }
+
+
+    const container =
+        document.createElement(
+            "div"
+        );
+
+
+    container.style.display =
+        "flex";
+
+    container.style.gap =
+        "4px";
+
+    container.style.marginLeft =
+        "10px";
+
+
+    const buttons = [
+
+        {
+            label: "▶",
+            speed: 1
+        },
+
+        {
+            label: "2×",
+            speed: 2
+        },
+
+        {
+            label: "5×",
+            speed: 5
+        },
+
+        {
+            label: "10×",
+            speed: 10
+        },
+
+        {
+            label: "Ⅱ",
+            speed: 0
+        }
+    ];
+
+
+    for (
+        const button
+        of buttons
+    ) {
+
+        const element =
+            document.createElement(
+                "button"
+            );
+
+
+        element.textContent =
+            button.label;
+
+
+        element.style.background =
+            "#25282c";
+
+        element.style.color =
+            "#ddd";
+
+        element.style.border =
+            "1px solid #444";
+
+        element.style.padding =
+            "4px 7px";
+
+        element.style.cursor =
+            "pointer";
+
+
+        element.addEventListener(
+            "click",
+            () => {
+
+                if (
+                    button.speed === 0
+                ) {
+
+                    pauseSimulation();
+
+                }
+
+                else {
+
+                    if (
+                        !SIMULATION.running
+                    ) {
+
+                        resumeSimulation();
+
+                    }
+
+                    setSimulationSpeed(
+                        button.speed
+                    );
+                }
+            }
+        );
+
+
+        container.appendChild(
+            element
+        );
+    }
+
+
+    toolbar.appendChild(
+        container
+    );
+}
+
+
+/* =========================================================
+   INITIALIZE PART 10
+   ========================================================= */
+
+createSimulationControls();
+
+updateClockDisplay();
+
+
+console.log(
+    "CONTROL POINT Part 10 loaded."
+);
+
+console.log(
+    "Simulation clock initialized."
+);
+
+console.log(
+    "Train movement engine initialized."
+);
+   /* =========================================================
+   CONTROL POINT - PART 11
+   Dynamic Route Construction
+   ========================================================= */
+
+const ROUTE_PLANNER = {
+  activeTrainId: null,
+  activeRouteId: null,
+  plannedBlocks: [],
+  plannedNodes: [],
+  status: "IDLE",
+  message: ""
+};
+
+
+/* ---------------------------------------------------------
+   ROUTE PLANNER HELPERS
+   --------------------------------------------------------- */
+
+function getTrainDestinationNode(train) {
+  if (!train) return null;
+
+  const destinationMP = train.destinationMilepost;
+
+  if (typeof destinationMP !== "number") return null;
+
+  let closest = null;
+  let closestDistance = Infinity;
+
+  Object.values(TRACK_GRAPH.nodes).forEach(node => {
+    if (typeof node.milepost !== "number") return;
+
+    const distance = Math.abs(node.milepost - destinationMP);
+
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = node;
+    }
+  });
+
+  return closest;
+}
+
+
+function getTrainCurrentNode(train) {
+  if (!train) return null;
+
+  if (train.currentNodeId && TRACK_GRAPH.nodes[train.currentNodeId]) {
+    return TRACK_GRAPH.nodes[train.currentNodeId];
+  }
+
+  const currentMP = train.currentMilepost;
+
+  if (typeof currentMP !== "number") return null;
+
+  let closest = null;
+  let closestDistance = Infinity;
+
+  Object.values(TRACK_GRAPH.nodes).forEach(node => {
+    if (typeof node.milepost !== "number") return;
+
+    const distance = Math.abs(node.milepost - currentMP);
+
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = node;
+    }
+  });
+
+  return closest;
+}
+
+
+/* ---------------------------------------------------------
+   FIND BLOCK PATH
+   --------------------------------------------------------- */
+
+function planTrainBlockPath(train) {
+  if (!train) {
+    return {
+      success: false,
+      reason: "No train selected."
+    };
+  }
+
+  const startNode = getTrainCurrentNode(train);
+  const destinationNode = getTrainDestinationNode(train);
+
+  if (!startNode || !destinationNode) {
+    return {
+      success: false,
+      reason: "Unable to resolve train location or destination."
+    };
+  }
+
+  const path = findBlockPath(
+    startNode.id,
+    destinationNode.id
+  );
+
+  if (!path || !path.length) {
+    return {
+      success: false,
+      reason: "No valid topology path found."
+    };
+  }
+
+  return {
+    success: true,
+    startNode,
+    destinationNode,
+    blocks: path
+  };
+}
+
+
+/* ---------------------------------------------------------
+   BLOCK SAFETY
+   --------------------------------------------------------- */
+
+function isBlockAvailableForRoute(blockId, trainId) {
+  const runtime = BLOCK_RUNTIME[blockId];
+
+  if (!runtime) {
+    return {
+      allowed: false,
+      reason: `Block ${blockId} does not exist in runtime.`
+    };
+  }
+
+  if (runtime.maintenance) {
+    return {
+      allowed: false,
+      reason: `Block ${blockId} is under maintenance.`
+    };
+  }
+
+  if (
+    runtime.occupied &&
+    runtime.occupiedBy !== trainId
+  ) {
+    return {
+      allowed: false,
+      reason: `Block ${blockId} is occupied.`
+    };
+  }
+
+  if (
+    runtime.reserved &&
+    runtime.reservedBy !== trainId
+  ) {
+    return {
+      allowed: false,
+      reason: `Block ${blockId} is reserved by another movement.`
+    };
+  }
+
+  return {
+    allowed: true
+  };
+}
+
+
+/* ---------------------------------------------------------
+   PREPARE BLOCK RUNTIME
+   --------------------------------------------------------- */
+
+function ensureTopologyBlocksExist() {
+  Object.values(TRACK_GRAPH.blocks).forEach(block => {
+
+    if (!BLOCK_RUNTIME[block.id]) {
+      BLOCK_RUNTIME[block.id] = {
+        id: block.id,
+        occupied: false,
+        occupiedBy: null,
+        reserved: false,
+        reservedBy: null,
+        maintenance: false
+      };
+    }
+
+  });
+}
+
+
+/* ---------------------------------------------------------
+   RESERVE PATH
+   --------------------------------------------------------- */
+
+function reserveTrainPath(train, blockPath) {
+
+  const reserved = [];
+
+  for (const blockId of blockPath) {
+
+    const result = isBlockAvailableForRoute(
+      blockId,
+      train.id
+    );
+
+    if (!result.allowed) {
+
+      reserved.forEach(id => {
+        if (BLOCK_RUNTIME[id]) {
+          BLOCK_RUNTIME[id].reserved = false;
+          BLOCK_RUNTIME[id].reservedBy = null;
+        }
+      });
+
+      return {
+        success: false,
+        reason: result.reason
+      };
+    }
+
+    const runtime = BLOCK_RUNTIME[blockId];
+
+    runtime.reserved = true;
+    runtime.reservedBy = train.id;
+
+    reserved.push(blockId);
+  }
+
+  return {
+    success: true,
+    blocks: reserved
+  };
+}
+
+
+/* ---------------------------------------------------------
+   RELEASE BLOCK
+   --------------------------------------------------------- */
+
+function releaseTrainBlock(blockId, trainId) {
+
+  const runtime = BLOCK_RUNTIME[blockId];
+
+  if (!runtime) return;
+
+  if (runtime.reservedBy === trainId) {
+    runtime.reserved = false;
+    runtime.reservedBy = null;
+  }
+
+  if (runtime.occupiedBy === trainId) {
+    runtime.occupied = false;
+    runtime.occupiedBy = null;
+  }
+}
+
+
+/* ---------------------------------------------------------
+   CREATE DYNAMIC ROUTE
+   --------------------------------------------------------- */
+
+function createDynamicTrainRoute(trainId) {
+
+  const train = findTrain(trainId);
+
+  if (!train) {
+    return {
+      success: false,
+      reason: "Train not found."
+    };
+  }
+
+  ensureTopologyBlocksExist();
+
+  const plan = planTrainBlockPath(train);
+
+  if (!plan.success) {
+    ROUTE_PLANNER.status = "FAILED";
+    ROUTE_PLANNER.message = plan.reason;
+
+    return plan;
+  }
+
+  const reservation = reserveTrainPath(
+    train,
+    plan.blocks
+  );
+
+  if (!reservation.success) {
+
+    ROUTE_PLANNER.status = "BLOCKED";
+    ROUTE_PLANNER.message = reservation.reason;
+
+    return reservation;
+  }
+
+  const routeId =
+    `AUTO_${train.id}_${Date.now()}`;
+
+  const route = {
+    id: routeId,
+    type: "TRAIN_ROUTE",
+    trainId: train.id,
+
+    startNode: plan.startNode.id,
+    destinationNode: plan.destinationNode.id,
+
+    blocks: reservation.blocks.slice(),
+
+    active: false,
+    signalRequested: false,
+
+    createdAt: SIMULATION.currentMinutes
+  };
+
+  ROUTES[routeId] = route;
+
+  train.activeRouteId = routeId;
+  train.routeBlocks = reservation.blocks.slice();
+  train.currentRouteIndex = 0;
+
+  ROUTE_PLANNER.activeTrainId = train.id;
+  ROUTE_PLANNER.activeRouteId = routeId;
+  ROUTE_PLANNER.plannedBlocks = reservation.blocks.slice();
+  ROUTE_PLANNER.plannedNodes = [
+    plan.startNode.id,
+    plan.destinationNode.id
+  ];
+
+  ROUTE_PLANNER.status = "ROUTE_PLANNED";
+  ROUTE_PLANNER.message =
+    `${train.symbol} route planned.`;
+
+  return {
+    success: true,
+    route
+  };
+}
+
+
+/* ---------------------------------------------------------
+   ACTIVATE ROUTE
+   --------------------------------------------------------- */
+
+function activateDynamicTrainRoute(routeId) {
+
+  const route = ROUTES[routeId];
+
+  if (!route) {
+    return {
+      success: false,
+      reason: "Route not found."
+    };
+  }
+
+  const train = findTrain(route.trainId);
+
+  if (!train) {
+    return {
+      success: false,
+      reason: "Train no longer exists."
+    };
+  }
+
+  if (!route.blocks.length) {
+    return {
+      success: false,
+      reason: "Route contains no blocks."
+    };
+  }
+
+  /*
+     Establish the route through the existing
+     interlocking system where possible.
+  */
+
+  route.blocks.forEach(blockId => {
+
+    const block = BLOCK_RUNTIME[blockId];
+
+    if (!block) return;
+
+    block.reserved = true;
+    block.reservedBy = train.id;
+
+  });
+
+  route.active = true;
+
+  train.activeRouteId = route.id;
+  train.routeActive = true;
+
+  ROUTE_PLANNER.status = "ROUTE_ACTIVE";
+  ROUTE_PLANNER.message =
+    `${train.symbol} route is active.`;
+
+  return {
+    success: true,
+    route
+  };
+}
+
+
+/* ---------------------------------------------------------
+   REQUEST ROUTE FOR TRAIN
+   --------------------------------------------------------- */
+
+function routeTrainToDestination(trainId) {
+
+  const planned = createDynamicTrainRoute(trainId);
+
+  if (!planned.success) {
+    return planned;
+  }
+
+  return activateDynamicTrainRoute(
+    planned.route.id
+  );
+}
+
+
+/* ---------------------------------------------------------
+   RELEASE REAR OF ROUTE
+   --------------------------------------------------------- */
+
+function releaseClearedRouteBlocks(train) {
+
+  if (!train || !train.activeRouteId) {
+    return;
+  }
+
+  const route = ROUTES[train.activeRouteId];
+
+  if (!route) return;
+
+  const currentIndex =
+    train.currentRouteIndex || 0;
+
+  for (let i = 0; i < currentIndex; i++) {
+
+    const blockId = route.blocks[i];
+
+    if (!blockId) continue;
+
+    releaseTrainBlock(
+      blockId,
+      train.id
+    );
+  }
+}
+
+
+/* ---------------------------------------------------------
+   ADVANCE TRAIN THROUGH ROUTE
+   --------------------------------------------------------- */
+
+function advanceTrainRoute(train) {
+
+  if (!train || !train.activeRouteId) {
+    return false;
+  }
+
+  const route = ROUTES[train.activeRouteId];
+
+  if (!route || !route.active) {
+    return false;
+  }
+
+  const index =
+    train.currentRouteIndex || 0;
+
+  if (index >= route.blocks.length - 1) {
+
+    /*
+       Destination reached.
+    */
+
+    return false;
+  }
+
+  const currentBlock =
+    route.blocks[index];
+
+  const nextBlock =
+    route.blocks[index + 1];
+
+  const nextRuntime =
+    BLOCK_RUNTIME[nextBlock];
+
+  if (!nextRuntime) {
+    return false;
+  }
+
+  if (
+    nextRuntime.occupied &&
+    nextRuntime.occupiedBy !== train.id
+  ) {
+    train.holdReason =
+      `Block ${nextBlock} occupied.`;
+
+    return false;
+  }
+
+  if (
+    nextRuntime.maintenance
+  ) {
+    train.holdReason =
+      `Block ${nextBlock} under maintenance.`;
+
+    return false;
+  }
+
+  /*
+     Leave current block.
+  */
+
+  releaseTrainBlock(
+    currentBlock,
+    train.id
+  );
+
+  /*
+     Enter next block.
+  */
+
+  nextRuntime.occupied = true;
+  nextRuntime.occupiedBy = train.id;
+
+  nextRuntime.reserved = true;
+  nextRuntime.reservedBy = train.id;
+
+  train.currentRouteIndex =
+    index + 1;
+
+  train.currentBlockId =
+    nextBlock;
+
+  train.holdReason = null;
+
+  releaseClearedRouteBlocks(train);
+
+  return true;
+}
+
+
+/* ---------------------------------------------------------
+   ROUTE COMPLETION
+   --------------------------------------------------------- */
+
+function finishDynamicRoute(train) {
+
+  if (!train || !train.activeRouteId) {
+    return;
+  }
+
+  const route =
+    ROUTES[train.activeRouteId];
+
+  if (!route) return;
+
+  route.blocks.forEach(blockId => {
+    releaseTrainBlock(
+      blockId,
+      train.id
+    );
+  });
+
+  route.active = false;
+
+  train.routeActive = false;
+  train.activeRouteId = null;
+  train.routeBlocks = [];
+  train.currentRouteIndex = 0;
+  train.currentBlockId = null;
+
+  ROUTE_PLANNER.status = "COMPLETE";
+  ROUTE_PLANNER.message =
+    `${train.symbol} route complete.`;
+}
+
+
+/* ---------------------------------------------------------
+   ROUTE VALIDATION
+   --------------------------------------------------------- */
+
+function validateDynamicRoute(trainId) {
+
+  const train = findTrain(trainId);
+
+  if (!train) {
+    return {
+      valid: false,
+      reason: "Train not found."
+    };
+  }
+
+  const route =
+    train.activeRouteId
+      ? ROUTES[train.activeRouteId]
+      : null;
+
+  if (!route) {
+    return {
+      valid: false,
+      reason: "Train has no active route."
+    };
+  }
+
+  for (const blockId of route.blocks) {
+
+    const runtime =
+      BLOCK_RUNTIME[blockId];
+
+    if (!runtime) {
+      return {
+        valid: false,
+        reason: `Missing runtime block ${blockId}.`
+      };
+    }
+
+    if (
+      runtime.maintenance &&
+      runtime.occupiedBy !== train.id
+    ) {
+      return {
+        valid: false,
+        reason: `Route enters maintenance block ${blockId}.`
+      };
+    }
+
+    if (
+      runtime.occupied &&
+      runtime.occupiedBy !== train.id
+    ) {
+      return {
+        valid: false,
+        reason: `Route conflict in ${blockId}.`
+      };
+    }
+  }
+
+  return {
+    valid: true
+  };
+}
+
+
+/* ---------------------------------------------------------
+   ROUTE STATUS
+   --------------------------------------------------------- */
+
+function getDynamicRouteStatus(trainId) {
+
+  const train = findTrain(trainId);
+
+  if (!train) return null;
+
+  const route =
+    train.activeRouteId
+      ? ROUTES[train.activeRouteId]
+      : null;
+
+  if (!route) {
+    return {
+      trainId,
+      active: false,
+      blocks: []
+    };
+  }
+
+  return {
+    trainId,
+    routeId: route.id,
+    active: route.active,
+
+    currentBlock:
+      train.currentBlockId,
+
+    currentIndex:
+      train.currentRouteIndex,
+
+    totalBlocks:
+      route.blocks.length,
+
+    blocks:
+      route.blocks.slice(),
+
+    destination:
+      route.destinationNode
+  };
+}
+
+
+/* ---------------------------------------------------------
+   ROUTE DEBUG
+   --------------------------------------------------------- */
+
+function debugRoutePlanner(trainId) {
+
+  const status =
+    getDynamicRouteStatus(trainId);
+
+  console.log(
+    "CONTROL POINT ROUTE STATUS:",
+    status
+  );
+
+  return status;
+}
+   /* =========================================================
+   CONTROL POINT - PART 12
+   Interlocking & Route Locking
+   ========================================================= */
+
+const INTERLOCKING = {
+
+  routes: {},
+
+  switchLocks: {},
+
+  approachLocks: {},
+
+  signalLocks: {},
+
+  initialized: false
+
+};
+   function initializeSwitchRuntime() {
+
+  Object.values(SWITCHES).forEach(sw => {
+
+    if (!sw.id) return;
+
+    INTERLOCKING.switchLocks[sw.id] = {
+      locked: false,
+      lockedBy: null,
+      position: sw.position || "NORMAL",
+      requestedPosition: sw.position || "NORMAL"
+    };
+
+  });
+
+  INTERLOCKING.initialized = true;
+}
+   function getRequiredSwitchPositions(route) {
+
+  if (!route) return [];
+
+  const requirements = [];
+
+  /*
+     Each topology edge may optionally contain:
+       switchId
+       requiredPosition
+
+     Example:
+
+       {
+         from: "CP421",
+         to: "CP426",
+         switchId: "SW421A",
+         requiredPosition: "NORMAL"
+       }
+  */
+
+  route.blocks.forEach(blockId => {
+
+    const block = TRACK_GRAPH.blocks[blockId];
+
+    if (!block) return;
+
+    if (!block.edges) return;
+
+    block.edges.forEach(edgeId => {
+
+      const edge = TRACK_GRAPH.edges[edgeId];
+
+      if (!edge || !edge.switchId) return;
+
+      requirements.push({
+        switchId: edge.switchId,
+        position: edge.requiredPosition || "NORMAL"
+      });
+
+    });
+
+  });
+
+  return requirements;
+}
+   function checkRouteSwitchConflicts(route) {
+
+  const requirements =
+    getRequiredSwitchPositions(route);
+
+  for (const requirement of requirements) {
+
+    const lock =
+      INTERLOCKING.switchLocks[
+        requirement.switchId
+      ];
+
+    if (!lock) continue;
+
+    if (
+      lock.locked &&
+      lock.lockedBy !== route.id
+    ) {
+
+      return {
+        allowed: false,
+        reason:
+          `Switch ${requirement.switchId} locked by another route.`
+      };
+    }
+
+  }
+
+  return {
+    allowed: true,
+    requirements
+  };
+}
+   function setInterlockingSwitch(
+  switchId,
+  position,
+  routeId
+) {
+
+  const lock =
+    INTERLOCKING.switchLocks[switchId];
+
+  if (!lock) {
+
+    return {
+      success: false,
+      reason: `Unknown switch ${switchId}.`
+    };
+  }
+
+  if (
+    lock.locked &&
+    lock.lockedBy !== routeId
+  ) {
+
+    return {
+      success: false,
+      reason:
+        `Switch ${switchId} is locked.`
+    };
+  }
+
+  /*
+     Physical occupancy protection.
+  */
+
+  const switchObject =
+    SWITCHES[switchId];
+
+  if (
+    switchObject &&
+    switchObject.occupied
+  ) {
+
+    return {
+      success: false,
+      reason:
+        `Switch ${switchId} is occupied.`
+    };
+  }
+
+  lock.position = position;
+  lock.requestedPosition = position;
+
+  return {
+    success: true
+  };
+}
+   function lockRouteSwitches(route) {
+
+  const check =
+    checkRouteSwitchConflicts(route);
+
+  if (!check.allowed) {
+    return check;
+  }
+
+  for (const requirement of check.requirements) {
+
+    const lock =
+      INTERLOCKING.switchLocks[
+        requirement.switchId
+      ];
+
+    if (!lock) continue;
+
+    const result =
+      setInterlockingSwitch(
+        requirement.switchId,
+        requirement.position,
+        route.id
+      );
+
+    if (!result.success) {
+      return result;
+    }
+
+    lock.locked = true;
+    lock.lockedBy = route.id;
+  }
+
+  return {
+    allowed: true
+  };
+}
+   function activateDynamicTrainRoute(routeId) {
+
+  const route = ROUTES[routeId];
+
+  if (!route) {
+    return {
+      success: false,
+      reason: "Route not found."
+    };
+  }
+
+  const train = findTrain(route.trainId);
+
+  if (!train) {
+    return {
+      success: false,
+      reason: "Train no longer exists."
+    };
+  }
+
+  /*
+     First verify the route's switches.
+  */
+
+  const switchResult =
+    lockRouteSwitches(route);
+
+  if (!switchResult.allowed) {
+
+    ROUTE_PLANNER.status = "SWITCH_CONFLICT";
+    ROUTE_PLANNER.message =
+      switchResult.reason;
+
+    return {
+      success: false,
+      reason: switchResult.reason
+    };
+  }
+
+  /*
+     Reserve blocks.
+  */
+
+  for (const blockId of route.blocks) {
+
+    const block =
+      BLOCK_RUNTIME[blockId];
+
+    if (!block) continue;
+
+    block.reserved = true;
+    block.reservedBy = train.id;
+  }
+
+  route.active = true;
+
+  route.locked = true;
+
+  train.activeRouteId = route.id;
+  train.routeActive = true;
+
+  ROUTE_PLANNER.status = "ROUTE_ACTIVE";
+
+  ROUTE_PLANNER.message =
+    `${train.symbol} route active.`;
+
+  return {
+    success: true,
+    route
+  };
+}
+   function canClearSignalForRoute(signalId, route) {
+
+  if (!route) {
+    return {
+      allowed: false,
+      reason: "No route."
+    };
+  }
+
+  const signal =
+    SIGNAL_SYSTEM.runtime?.[signalId];
+
+  /*
+     If this signal isn't represented in the
+     runtime system yet, don't invent its state.
+  */
+
+  if (!signal) {
+    return {
+      allowed: true
+    };
+  }
+
+  if (
+    signal.locked &&
+    signal.lockedBy !== route.id
+  ) {
+
+    return {
+      allowed: false,
+      reason:
+        `Signal ${signalId} is locked.`
+    };
+  }
+
+  /*
+     Check every route block.
+  */
+
+  for (const blockId of route.blocks) {
+
+    const runtime =
+      BLOCK_RUNTIME[blockId];
+
+    if (!runtime) {
+
+      return {
+        allowed: false,
+        reason:
+          `Missing block ${blockId}.`
+      };
+    }
+
+    if (runtime.maintenance) {
+
+      return {
+        allowed: false,
+        reason:
+          `Block ${blockId} is under maintenance.`
+      };
+    }
+
+    if (
+      runtime.occupied &&
+      runtime.occupiedBy !== route.trainId
+    ) {
+
+      return {
+        allowed: false,
+        reason:
+          `Block ${blockId} occupied.`
+      };
+    }
+
+  }
+
+  return {
+    allowed: true
+  };
+}
+   function lockSignalForRoute(signalId, routeId) {
+
+  if (!SIGNAL_SYSTEM.runtime) {
+    SIGNAL_SYSTEM.runtime = {};
+  }
+
+  if (!SIGNAL_SYSTEM.runtime[signalId]) {
+
+    SIGNAL_SYSTEM.runtime[signalId] = {
+      indication: "STOP",
+      locked: false,
+      lockedBy: null
+    };
+
+  }
+
+  const signal =
+    SIGNAL_SYSTEM.runtime[signalId];
+
+  if (
+    signal.locked &&
+    signal.lockedBy !== routeId
+  ) {
+
+    return {
+      success: false,
+      reason:
+        `Signal ${signalId} already locked.`
+    };
+  }
+
+  signal.locked = true;
+  signal.lockedBy = routeId;
+
+  return {
+    success: true
+  };
+}
+   function calculateRouteSignalIndication(
+  signalId,
+  route
+) {
+
+  if (!route) {
+    return "STOP";
+  }
+
+  if (!route.active) {
+    return "STOP";
+  }
+
+  const firstBlock =
+    route.blocks[0];
+
+  const secondBlock =
+    route.blocks[1];
+
+  const firstRuntime =
+    BLOCK_RUNTIME[firstBlock];
+
+  const secondRuntime =
+    secondBlock
+      ? BLOCK_RUNTIME[secondBlock]
+      : null;
+
+  if (!firstRuntime) {
+    return "STOP";
+  }
+
+  /*
+     Immediate block occupied by another train.
+  */
+
+  if (
+    firstRuntime.occupied &&
+    firstRuntime.occupiedBy !== route.trainId
+  ) {
+
+    return "STOP";
+  }
+
+  /*
+     Next block occupied means approach-style
+     restriction in our simulation.
+  */
+
+  if (
+    secondRuntime &&
+    secondRuntime.occupied &&
+    secondRuntime.occupiedBy !== route.trainId
+  ) {
+
+    return "APPROACH";
+  }
+
+  /*
+     Maintenance ahead.
+  */
+
+  if (
+    secondRuntime &&
+    secondRuntime.maintenance
+  ) {
+
+    return "APPROACH";
+  }
+
+  return "CLEAR";
+}
+   function requestRouteSignal(
+  routeId,
+  signalId
+) {
+
+  const route =
+    ROUTES[routeId];
+
+  if (!route) {
+
+    return {
+      success: false,
+      reason: "Route not found."
+    };
+  }
+
+  const permission =
+    canClearSignalForRoute(
+      signalId,
+      route
+    );
+
+  if (!permission.allowed) {
+
+    return {
+      success: false,
+      reason: permission.reason
+    };
+  }
+
+  const lock =
+    lockSignalForRoute(
+      signalId,
+      route.id
+    );
+
+  if (!lock.success) {
+    return lock;
+  }
+
+  const indication =
+    calculateRouteSignalIndication(
+      signalId,
+      route
+    );
+
+  SIGNAL_SYSTEM.runtime[signalId].indication =
+    indication;
+
+  route.signalRequested = true;
+  route.signalId = signalId;
+
+  return {
+    success: true,
+    indication
+  };
+}
+   function applyApproachLock(route, train) {
+
+  if (!route || !train) return;
+
+  const currentIndex =
+    train.currentRouteIndex || 0;
+
+  /*
+     Once the train has entered the route,
+     protect the route from immediate cancellation.
+  */
+
+  if (currentIndex >= 0) {
+
+    INTERLOCKING.approachLocks[route.id] = {
+      locked: true,
+      trainId: train.id,
+      lockedAt: SIMULATION.currentMinutes
+    };
+
+    route.approachLocked = true;
+  }
+}
+   function cancelDynamicRoute(routeId) {
+
+  const route =
+    ROUTES[routeId];
+
+  if (!route) {
+    return {
+      success: false,
+      reason: "Route not found."
+    };
+  }
+
+  const approachLock =
+    INTERLOCKING.approachLocks[routeId];
+
+  if (
+    approachLock &&
+    approachLock.locked
+  ) {
+
+    return {
+      success: false,
+      reason:
+        "Route is approach locked."
+    };
+  }
+
+  /*
+     Release blocks.
+  */
+
+  route.blocks.forEach(blockId => {
+
+    const runtime =
+      BLOCK_RUNTIME[blockId];
+
+    if (!runtime) return;
+
+    if (
+      runtime.reservedBy === route.trainId
+    ) {
+
+      runtime.reserved = false;
+      runtime.reservedBy = null;
+    }
+
+  });
+
+  /*
+     Release switches.
+  */
+
+  Object.values(
+    INTERLOCKING.switchLocks
+  ).forEach(lock => {
+
+    if (lock.lockedBy === route.id) {
+
+      lock.locked = false;
+      lock.lockedBy = null;
+    }
+
+  });
+
+  /*
+     Release signals.
+  */
+
+  if (
+    route.signalId &&
+    SIGNAL_SYSTEM.runtime?.[route.signalId]
+  ) {
+
+    const signal =
+      SIGNAL_SYSTEM.runtime[
+        route.signalId
+      ];
+
+    if (signal.lockedBy === route.id) {
+
+      signal.locked = false;
+      signal.lockedBy = null;
+      signal.indication = "STOP";
+    }
+  }
+
+  route.active = false;
+  route.locked = false;
+  route.signalRequested = false;
+
+  return {
+    success: true
+  };
+}
+   function releasePassedRouteInterlocking(train) {
+
+  if (!train || !train.activeRouteId) {
+    return;
+  }
+
+  const route =
+    ROUTES[train.activeRouteId];
+
+  if (!route) return;
+
+  const index =
+    train.currentRouteIndex || 0;
+
+  for (let i = 0; i < index; i++) {
+
+    const blockId =
+      route.blocks[i];
+
+    const runtime =
+      BLOCK_RUNTIME[blockId];
+
+    if (
+      runtime &&
+      runtime.occupiedBy === train.id
+    ) {
+
+      runtime.occupied = false;
+      runtime.occupiedBy = null;
+    }
+
+  }
+
+  /*
+     Switches that are no longer required by
+     the remaining route may eventually be released.
+  */
+
+  releaseUnusedRouteSwitches(route, index);
+}
+   function releaseUnusedRouteSwitches(route, currentIndex) {
+
+  if (!route) return;
+
+  const remainingBlocks =
+    route.blocks.slice(currentIndex);
+
+  const stillRequired = new Set();
+
+  remainingBlocks.forEach(blockId => {
+
+    const block =
+      TRACK_GRAPH.blocks[blockId];
+
+    if (!block || !block.edges) return;
+
+    block.edges.forEach(edgeId => {
+
+      const edge =
+        TRACK_GRAPH.edges[edgeId];
+
+      if (edge && edge.switchId) {
+        stillRequired.add(edge.switchId);
+      }
+
+    });
+
+  });
+
+  Object.entries(
+    INTERLOCKING.switchLocks
+  ).forEach(([switchId, lock]) => {
+
+    if (
+      lock.lockedBy === route.id &&
+      !stillRequired.has(switchId)
+    ) {
+
+      lock.locked = false;
+      lock.lockedBy = null;
+    }
+
+  });
+}
+   function updateTrainInterlocking(train) {
+
+  if (!train) return;
+
+  if (train.activeRouteId) {
+
+    const route =
+      ROUTES[train.activeRouteId];
+
+    if (!route) return;
+
+    applyApproachLock(
+      route,
+      train
+    );
+
+    releasePassedRouteInterlocking(
+      train
+    );
+
+    const validation =
+      validateDynamicRoute(
+        train.id
+      );
+
+    if (!validation.valid) {
+
+      train.speed = 0;
+
+      train.holdReason =
+        validation.reason;
+    }
+
+  }
+}
    
 </script>
 
